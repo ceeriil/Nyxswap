@@ -5,7 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { hardhat } from "viem/chains";
-import { Bars3Icon, BugAntIcon } from "@heroicons/react/24/outline";
+import { Bars3Icon, LockClosedIcon, ScaleIcon, ShieldCheckIcon, WalletIcon } from "@heroicons/react/24/outline";
 import { FaucetButton, RainbowKitCustomConnectButton } from "~~/components/scaffold-eth";
 import { useOutsideClick, useTargetNetwork } from "~~/hooks/scaffold-eth";
 
@@ -17,13 +17,24 @@ type HeaderMenuLink = {
 
 export const menuLinks: HeaderMenuLink[] = [
   {
-    label: "Home",
-    href: "/",
+    label: "Trade",
+    href: "/app",
+    icon: <ScaleIcon className="h-4 w-4" />,
   },
   {
-    label: "Debug Contracts",
-    href: "/debug",
-    icon: <BugAntIcon className="h-4 w-4" />,
+    label: "Vault",
+    href: "/vault",
+    icon: <WalletIcon className="h-4 w-4" />,
+  },
+  {
+    label: "History",
+    href: "/history",
+    icon: <LockClosedIcon className="h-4 w-4" />,
+  },
+  {
+    label: "Verify",
+    href: "/verify",
+    icon: <ShieldCheckIcon className="h-4 w-4" />,
   },
 ];
 
@@ -40,8 +51,8 @@ export const HeaderMenuLinks = () => {
               href={href}
               passHref
               className={`${
-                isActive ? "bg-base-300" : ""
-              } hover:bg-base-300 focus:!bg-base-300 h-full px-4 text-sm gap-2 flex items-center whitespace-nowrap`}
+                isActive ? "text-base-content" : "text-base-content/70"
+              } hover:text-base-content focus:outline-none transition-colors h-full px-4 text-sm gap-2 flex items-center whitespace-nowrap`}
             >
               {icon}
               <span>{label}</span>
@@ -83,11 +94,11 @@ export const Header = () => {
         </details>
         <Link href="/" passHref className="hidden lg:flex items-center gap-2 ml-4 mr-6 shrink-0">
           <div className="flex relative w-10 h-10">
-            <Image alt="SE2 logo" className="cursor-pointer" fill src="/logo.svg" />
+            <Image alt="NyxSwap logo" className="cursor-pointer rounded-full" fill src="/logo-new.png" />
           </div>
           <div className="flex flex-col">
-            <span className="font-bold leading-tight">Scaffold-ETH</span>
-            <span className="text-xs">Ethereum dev stack</span>
+            <span className="font-[500] font-nord font-[0.8rem] leading-tight">NyxSwap</span>
+            <span className="text-xs text-landing-muted">Confidential order flow</span>
           </div>
         </Link>
         <ul className="hidden lg:flex lg:flex-nowrap h-full m-0 p-0 list-none">

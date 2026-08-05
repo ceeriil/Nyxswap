@@ -5,6 +5,9 @@ import prettierPlugin from "eslint-plugin-prettier";
 import { defineConfig } from "eslint/config";
 
 export default defineConfig([
+  {
+    ignores: [".next", "next-env.d.ts", "temp"],
+  },
   ...nextCoreWebVitals,
   ...nextTypescript,
   prettierConfig,
@@ -23,7 +26,6 @@ export default defineConfig([
         },
       ],
     },
-    ignores: [".next", "next-env.d.ts"],
   },
   {
     files: ["**/*.ts", "**/*.tsx"],

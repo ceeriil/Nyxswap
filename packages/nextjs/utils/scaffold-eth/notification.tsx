@@ -1,12 +1,13 @@
 import React from "react";
 import { Toast, ToastPosition, toast } from "react-hot-toast";
-import { XMarkIcon } from "@heroicons/react/20/solid";
 import {
-  CheckCircleIcon,
-  ExclamationCircleIcon,
-  ExclamationTriangleIcon,
-  InformationCircleIcon,
-} from "@heroicons/react/24/solid";
+  PiCheckCircleBold,
+  PiInfoBold,
+  PiSpinnerGapBold,
+  PiWarningCircleBold,
+  PiXBold,
+  PiXCircleBold,
+} from "react-icons/pi";
 
 type NotificationProps = {
   content: React.ReactNode;
@@ -23,11 +24,31 @@ type NotificationOptions = {
 };
 
 const ENUM_STATUSES = {
-  success: <CheckCircleIcon className="w-7 text-success" />,
-  loading: <span className="w-6 loading loading-spinner"></span>,
-  error: <ExclamationCircleIcon className="w-7 text-error" />,
-  info: <InformationCircleIcon className="w-7 text-info" />,
-  warning: <ExclamationTriangleIcon className="w-7 text-warning" />,
+  success: (
+    <span className="text-success">
+      <PiCheckCircleBold size={20} />
+    </span>
+  ),
+  loading: (
+    <span className="text-base-content/70 animate-spin inline-flex">
+      <PiSpinnerGapBold size={20} />
+    </span>
+  ),
+  error: (
+    <span className="text-error">
+      <PiXCircleBold size={20} />
+    </span>
+  ),
+  info: (
+    <span className="text-info">
+      <PiInfoBold size={20} />
+    </span>
+  ),
+  warning: (
+    <span className="text-warning">
+      <PiWarningCircleBold size={20} />
+    </span>
+  ),
 };
 
 const DEFAULT_DURATION = 3000;
@@ -46,19 +67,26 @@ const Notification = ({
   return toast.custom(
     (t: Toast) => (
       <div
-        className={`flex flex-row items-start justify-between max-w-sm shadow-center shadow-accent bg-base-200 p-4 transform-gpu relative transition-all duration-500 ease-in-out space-x-2
+        className={`flex flex-row items-start justify-between max-w-sm rounded-lg border border-base-300 bg-base-100 shadow-lg shadow-black/10 dark:shadow-black/40 p-4 transform-gpu relative transition-all duration-500 ease-in-out space-x-2
         ${
           position.substring(0, 3) == "top"
             ? `hover:translate-y-1 ${t.visible ? "top-0" : "-top-96"}`
             : `hover:-translate-y-1 ${t.visible ? "bottom-0" : "-bottom-96"}`
         }`}
       >
-        <div className="leading-[0] self-center">{icon ? icon : ENUM_STATUSES[status]}</div>
-        <div className={`overflow-x-hidden break-words whitespace-pre-line ${icon ? "mt-1" : ""}`}>{content}</div>
-
-        <div className={`cursor-pointer text-lg ${icon ? "mt-1" : ""}`} onClick={() => toast.dismiss(t.id)}>
-          <XMarkIcon className="w-6 cursor-pointer" onClick={() => toast.remove(t.id)} />
+        <div className="shrink-0 self-center">{icon ? icon : ENUM_STATUSES[status]}</div>
+        <div
+          className={`overflow-x-hidden break-words whitespace-pre-line text-sm font-medium leading-snug text-base-content ${icon ? "mt-1" : ""}`}
+        >
+          {content}
         </div>
+
+        <button
+          className={`shrink-0 text-base-content/50 hover:text-base-content transition-colors cursor-pointer ${icon ? "mt-1" : ""}`}
+          onClick={() => toast.dismiss(t.id)}
+        >
+          <PiXBold size={16} />
+        </button>
       </div>
     ),
     {
