@@ -3,8 +3,12 @@
 import { useState } from "react";
 import { DepositForm } from "./DepositForm";
 import { WithdrawForm } from "./WithdrawForm";
+import { Button } from "~~/components/landing/Button";
 
 type Tab = "deposit" | "withdraw";
+
+const TAB_CLASSES = "rounded-full px-4 py-1 h-8 text-sm";
+const INACTIVE_CLASSES = "border-transparent bg-transparent hover:bg-landing-button-bg";
 
 export const VaultCard = () => {
   const [tab, setTab] = useState<Tab>("deposit");
@@ -14,23 +18,23 @@ export const VaultCard = () => {
       <div className="card-body gap-4">
         <h1 className="card-title">Vault</h1>
 
-        <div role="tablist" className="tabs tabs-box w-fit">
-          <button
-            type="button"
-            role="tab"
-            className={`tab ${tab === "deposit" ? "tab-active" : ""}`}
+        <div className="inline-flex w-fit items-center gap-1 rounded-full border border-base-300 bg-base-200/60 p-1">
+          <Button
+            as="button"
             onClick={() => setTab("deposit")}
+            silver={tab === "deposit"}
+            className={`${TAB_CLASSES} ${tab === "deposit" ? "" : INACTIVE_CLASSES}`}
           >
             Deposit
-          </button>
-          <button
-            type="button"
-            role="tab"
-            className={`tab ${tab === "withdraw" ? "tab-active" : ""}`}
+          </Button>
+          <Button
+            as="button"
             onClick={() => setTab("withdraw")}
+            silver={tab === "withdraw"}
+            className={`${TAB_CLASSES} ${tab === "withdraw" ? "" : INACTIVE_CLASSES}`}
           >
             Withdraw
-          </button>
+          </Button>
         </div>
 
         {tab === "deposit" ? <DepositForm /> : <WithdrawForm />}

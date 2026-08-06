@@ -34,7 +34,7 @@ export const SwapSettings = ({
               <button
                 key={segment.value}
                 type="button"
-                className={`btn btn-xs join-item ${segment.value === slippageOption ? "btn-active" : ""}`}
+                className={`btn btn-sm rounded-lg join-item font-[500] ${segment.value === slippageOption ? "btn-active" : ""}`}
                 onClick={() => onSlippageOptionChange(segment.value)}
               >
                 {segment.label}
@@ -43,7 +43,7 @@ export const SwapSettings = ({
           </div>
           {slippageOption === "custom" && (
             <input
-              className="input input-xs input-bordered w-16"
+              className="input input-sm input-bordered w-20"
               placeholder="0.5"
               inputMode="decimal"
               value={customSlippage}
@@ -55,18 +55,18 @@ export const SwapSettings = ({
         </div>
       </div>
 
-      <div className="flex items-center justify-between border-t border-base-300 pt-4">
+      <div className="flex items-center justify-between  pt-4">
         <span className="text-sm font-medium">Transaction deadline</span>
         <div className="flex items-center gap-1.5">
           <input
-            className="input input-xs input-bordered w-14 text-right"
+            className="input input-sm  input-bordered w-20 text-right"
             inputMode="numeric"
             value={deadlineMinutes}
             onChange={e => {
               if (/^\d*$/.test(e.target.value)) onDeadlineMinutesChange(e.target.value);
             }}
           />
-          <span className="text-xs text-base-content/60">min</span>
+          <span className="text-sm text-base-content/60">min</span>
         </div>
       </div>
     </div>

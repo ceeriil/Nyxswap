@@ -1,40 +1,52 @@
 "use client";
 
 import { useState } from "react";
+import { useSwapHistory } from "../_lib/useSwapHistory";
+import { PoolActivityStats } from "./PoolActivityStats";
+import { SwapHistoryEmptyState } from "./SwapHistoryEmptyState";
+import { SwapHistoryTable } from "./SwapHistoryTable";
 
-type HistoryTab = "orders" | "batches";
+type Tab = "mine" | "pool";
 
 export const HistoryTabs = () => {
-  const [activeTab, setActiveTab] = useState<HistoryTab>("orders");
+  const [tab, setTab] = useState<Tab>("mine");
+  const { mySwaps, poolActivity, highlightId, isConnected } = useSwapHistory();
 
   return (
-    <div className="card bg-base-100 shadow-xl w-full max-w-2xl">
-      <div className="card-body">
-        <div role="tablist" className="tabs tabs-boxed w-fit">
+    <div className="card shadow-xl w-full max-w-4xl">
+      <div className="card-body gap-4">
+        <h1 className="card-title">History</h1>
+
+        <div role="tablist" className="tabs tabs-box w-fit">
           <button
+            type="button"
             role="tab"
-            className={`tab ${activeTab === "orders" ? "tab-active" : ""}`}
-            onClick={() => setActiveTab("orders")}
+            className={`tab ${tab === "mine" ? "tab-active" : ""}`}
+            onClick={() => setTab("mine")}
           >
-            My Orders
+            My Swaps
           </button>
           <button
+            type="button"
             role="tab"
-            className={`tab ${activeTab === "batches" ? "tab-active" : ""}`}
-            onClick={() => setActiveTab("batches")}
+            className={`tab ${tab === "pool" ? "tab-active" : ""}`}
+            onClick={() => setTab("pool")}
           >
-            Settled Batches
+            Pool Activity
           </button>
         </div>
 
-        {activeTab === "orders" ? (
-          <p className="text-sm text-base-content/70 mt-4">
-            Orders placed by your connected wallet, hidden while pending and revealed once settled.
-          </p>
+        {tab === "mine" ? (
+          mySwaps.length === 0 ? (
+            <SwapHistoryEmptyState connected={isConnected} />
+          ) : (
+            <SwapHistoryTable records={mySwaps} />
+          )
         ) : (
-          <p className="text-sm text-base-content/70 mt-4">
-            Publicly visible matches from past settled batches, viewable by anyone.
-          </p>
+          <>
+            <PoolActivityStats records={poolActivity} />
+            <SwapHistoryTable records={poolActivity} showTrader highlightId={highlightId} />
+          </>
         )}
       </div>
     </div>

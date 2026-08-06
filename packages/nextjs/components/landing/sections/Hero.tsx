@@ -1,12 +1,17 @@
 import { Button } from "~~/components/landing/Button";
+import { DiamondDitherBackground } from "~~/components/landing/DiamondDitherBackground";
 import { LineSweepText } from "~~/components/landing/LineSweepText";
 import { ScrollCue } from "~~/components/landing/ScrollCue";
-import { VortexTwist } from "~~/components/landing/VortexTwist";
+
+// import { VortexTwist } from "~~/components/landing/VortexTwist";
 
 export const Hero = () => {
   return (
     <section className="relative w-full px-4 lg:px-12 pt-20 pb-24 md:pt-28 md:pb-32 min-h-[600px] md:min-h-[780px] flex flex-col items-center text-center overflow-hidden">
-      <VortexTwist className="absolute inset-0 -z-10 h-full w-full " />
+      {/* Trying out the diamond-dither background from the bayer-dithering demo.
+          Swap back to <VortexTwist /> below if this doesn't work out. */}
+      <DiamondDitherBackground className="absolute inset-0 -z-10 h-full w-full" />
+      {/* <VortexTwist className="absolute inset-0 -z-10 h-full w-full " /> */}
       <span className="font-nord text-landing-muted text-xs md:text-sm tracking-[0.2em] uppercase mb-6 mt-16">
         Confidential order flow on Flare
       </span>
