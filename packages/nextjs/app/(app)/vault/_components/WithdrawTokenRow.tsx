@@ -1,11 +1,9 @@
 "use client";
 
-import { formatUsd } from "../_lib/format";
-import { getUsdPrice } from "../_lib/mockPool";
-import { TOKENS, type TokenSymbol } from "../_lib/tokens";
-import { TokenSelect } from "./TokenSelect";
-import { formatUnits } from "viem";
-import { useAccount, useBalance } from "wagmi";
+import { TokenSelect } from "../../app/_components/TokenSelect";
+import { formatUsd } from "../../app/_lib/format";
+import { getUsdPrice } from "../../app/_lib/mockPool";
+import { type TokenSymbol } from "../../app/_lib/tokens";
 
 const AMOUNT_PATTERN = /^\d*\.?\d*$/;
 
@@ -14,21 +12,24 @@ type Props = {
   token: TokenSymbol;
   onTokenChange: (token: TokenSymbol) => void;
   amount: string;
-  onAmountChange?: (amount: string) => void;
+  onAmountChange: (amount: string) => void;
+  /** Amount of this token in the user's LP position — not a wallet balance. */
+  available: number;
   readOnly?: boolean;
 };
 
-export const TokenPairRow = ({ label, token, onTokenChange, amount, onAmountChange, readOnly }: Props) => {
-  const { address } = useAccount();
-  const isNative = TOKENS[token].isNative;
-  const { data: nativeBalance } = useBalance({ address, query: { enabled: Boolean(address) && isNative } });
-
-  // No pool/token contract deployed yet (see brief.md's open questions), so
-  // only the connected wallet's native balance is real — everything else is
-  // a placeholder until useScaffoldReadContract has something to read.
-  const balance = isNative && nativeBalance ? Number(formatUnits(nativeBalance.value, nativeBalance.decimals)) : null;
-  const balanceLabel = balance !== null ? balance.toFixed(4) : "0";
-
+// Same card shape as TokenPairRow, but the "available" figure comes from the
+// mock LP position (see mockVaultPosition.ts) rather than useBalance — a
+// withdrawal redeems the pool position, not the connected wallet.
+export const WithdrawTokenRow = ({
+  label,
+  token,
+  onTokenChange,
+  amount,
+  onAmountChange,
+  available,
+  readOnly,
+}: Props) => {
   const usdEstimate = amount && Number(amount) > 0 ? formatUsd(Number(amount) * getUsdPrice(token)) : null;
 
   return (
@@ -46,7 +47,7 @@ export const TokenPairRow = ({ label, token, onTokenChange, amount, onAmountChan
           value={amount}
           onChange={e => {
             const next = e.target.value;
-            if (AMOUNT_PATTERN.test(next)) onAmountChange?.(next);
+            if (AMOUNT_PATTERN.test(next)) onAmountChange(next);
           }}
         />
         <TokenSelect value={token} onChange={onTokenChange} />
@@ -56,13 +57,13 @@ export const TokenPairRow = ({ label, token, onTokenChange, amount, onAmountChan
         <span>{usdEstimate ? `≈ ${usdEstimate}` : null}</span>
         <span className="flex items-center gap-2">
           <span>
-            {balanceLabel} {token}
+            {available.toFixed(4)} {token} in pool
           </span>
-          {!readOnly && balance !== null && balance > 0 && (
+          {!readOnly && available > 0 && (
             <button
               type="button"
               className="font-semibold text-base-content/80 hover:text-base-content"
-              onClick={() => onAmountChange?.(String(balance))}
+              onClick={() => onAmountChange(String(available))}
             >
               Max
             </button>

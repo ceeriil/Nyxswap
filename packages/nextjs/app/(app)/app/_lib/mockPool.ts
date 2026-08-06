@@ -60,6 +60,12 @@ export function quoteSwap(tokenIn: TokenSymbol, tokenOut: TokenSymbol, amountIn:
   return { amountOut, spotPrice, executionPrice, priceImpactPct };
 }
 
+/** Current pool ratio (no fee applied) — used for Vault deposit's ratio-linked amounts. */
+export function getPoolRatio(tokenA: TokenSymbol, tokenB: TokenSymbol) {
+  const pool = getPool(tokenA, tokenB);
+  return { bPerA: pool.reserveB / pool.reserveA, aPerB: pool.reserveA / pool.reserveB };
+}
+
 export function getFtsoReferencePrice(tokenIn: TokenSymbol, tokenOut: TokenSymbol) {
   return MOCK_FTSO_USD_PRICE[tokenIn] / MOCK_FTSO_USD_PRICE[tokenOut];
 }

@@ -74,7 +74,7 @@ export const SwapCard = () => {
           minimumReceived={form.minimumReceived}
         />
 
-   {/*      <div className="flex justify-center">
+        {/*      <div className="flex justify-center">
           <PrivacyIndicator />
         </div> */}
 
