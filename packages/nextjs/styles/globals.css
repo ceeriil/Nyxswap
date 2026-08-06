@@ -132,3 +132,28 @@
 .link:hover {
   opacity: 80%;
 }
+/*
+  ---break---
+*/
+:root {
+  --destructive-foreground: var(--color-red-700);
+}
+/*
+  ---break---
+*/
+.dark {
+  --destructive-foreground: var(--color-red-400);
+}
+/*
+  ---break---
+*/
+@theme inline {
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-muted: var(--color-base-300);
+  --animate-skeleton: skeleton 2s -1s infinite linear;
+  @keyframes skeleton {
+  to {
+    background-position: -200% 0;
+    }
+  }
+}

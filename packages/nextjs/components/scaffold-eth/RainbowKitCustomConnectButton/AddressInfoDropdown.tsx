@@ -1,18 +1,18 @@
 import { useRef, useState } from "react";
 import { NetworkOptions } from "./NetworkOptions";
+import {
+  PiArrowSquareOutBold,
+  PiArrowsLeftRightBold,
+  PiCaretDownBold,
+  PiCheckCircleBold,
+  PiCopyBold,
+  PiEyeBold,
+  PiQrCodeBold,
+  PiSignOutBold,
+} from "react-icons/pi";
 import { getAddress } from "viem";
 import { Address } from "viem";
 import { useAccount, useDisconnect } from "wagmi";
-import {
-  ArrowLeftEndOnRectangleIcon,
-  ArrowTopRightOnSquareIcon,
-  ArrowsRightLeftIcon,
-  CheckCircleIcon,
-  ChevronDownIcon,
-  DocumentDuplicateIcon,
-  EyeIcon,
-  QrCodeIcon,
-} from "@heroicons/react/24/outline";
 import { BlockieAvatar } from "~~/components/scaffold-eth";
 import { useCopyToClipboard, useOutsideClick } from "~~/hooks/scaffold-eth";
 import { getTargetNetworks } from "~~/utils/scaffold-eth";
@@ -59,9 +59,11 @@ export const AddressInfoDropdown = ({
           <span className="ml-2 mr-1">
             {isENS(displayName) ? displayName : checkSumAddress?.slice(0, 6) + "..." + checkSumAddress?.slice(-4)}
           </span>
-          <ChevronDownIcon className="h-6 w-4 ml-2 sm:ml-0" />
+          <span className="ml-2 sm:ml-0">
+            <PiCaretDownBold size={16} />
+          </span>
         </summary>
-        <ul className="dropdown-content menu z-2 p-2 mt-2 shadow-lg bg-base-200 gap-1">
+        <ul className="dropdown-content menu z-10 p-2 mt-2 rounded-box border border-base-300 bg-base-100 shadow-lg shadow-black/10 dark:shadow-black/40 gap-1 min-w-56">
           <NetworkOptions hidden={!selectingNetwork} />
           <li className={selectingNetwork ? "hidden" : ""}>
             <div
@@ -70,12 +72,12 @@ export const AddressInfoDropdown = ({
             >
               {isAddressCopiedToClipboard ? (
                 <>
-                  <CheckCircleIcon className="text-xl font-normal h-6 w-4 ml-2 sm:ml-0" aria-hidden="true" />
+                  <PiCheckCircleBold size={18} aria-hidden="true" />
                   <span className="whitespace-nowrap">Copied!</span>
                 </>
               ) : (
                 <>
-                  <DocumentDuplicateIcon className="text-xl font-normal h-6 w-4 ml-2 sm:ml-0" aria-hidden="true" />
+                  <PiCopyBold size={18} aria-hidden="true" />
                   <span className="whitespace-nowrap">Copy address</span>
                 </>
               )}
@@ -83,13 +85,13 @@ export const AddressInfoDropdown = ({
           </li>
           <li className={selectingNetwork ? "hidden" : ""}>
             <label htmlFor="qrcode-modal" className="h-8 btn-sm flex gap-3 py-3">
-              <QrCodeIcon className="h-6 w-4 ml-2 sm:ml-0" />
+              <PiQrCodeBold size={18} />
               <span className="whitespace-nowrap">View QR Code</span>
             </label>
           </li>
           <li className={selectingNetwork ? "hidden" : ""}>
             <button className="h-8 btn-sm flex gap-3 py-3" type="button">
-              <ArrowTopRightOnSquareIcon className="h-6 w-4 ml-2 sm:ml-0" />
+              <PiArrowSquareOutBold size={18} />
               <a
                 target="_blank"
                 href={blockExplorerAddressLink}
@@ -109,14 +111,14 @@ export const AddressInfoDropdown = ({
                   setSelectingNetwork(true);
                 }}
               >
-                <ArrowsRightLeftIcon className="h-6 w-4 ml-2 sm:ml-0" /> <span>Switch Network</span>
+                <PiArrowsLeftRightBold size={18} /> <span>Switch Network</span>
               </button>
             </li>
           ) : null}
           {connector?.id === BURNER_WALLET_ID ? (
             <li>
               <label htmlFor="reveal-burner-pk-modal" className="h-8 btn-sm flex gap-3 py-3 text-error">
-                <EyeIcon className="h-6 w-4 ml-2 sm:ml-0" />
+                <PiEyeBold size={18} />
                 <span>Reveal Private Key</span>
               </label>
             </li>
@@ -127,7 +129,7 @@ export const AddressInfoDropdown = ({
               type="button"
               onClick={() => disconnect()}
             >
-              <ArrowLeftEndOnRectangleIcon className="h-6 w-4 ml-2 sm:ml-0" /> <span>Disconnect</span>
+              <PiSignOutBold size={18} /> <span>Disconnect</span>
             </button>
           </li>
         </ul>

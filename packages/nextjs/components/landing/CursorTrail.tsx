@@ -60,7 +60,7 @@ const CursorTrail = ({
   maxPoints = 3000,
   fadeTime = 2500,
   rippleSize = 100,
-  intensity = 0.5,
+  intensity = 0.9,
 }: CursorTrailProps) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animationRef = useRef<number | undefined>(undefined);
@@ -88,7 +88,7 @@ const CursorTrail = ({
         const ageRatio = (now - point.timestamp) / fadeTime;
         if (ageRatio >= 1) continue;
 
-        const baseOpacity = intensity * Math.pow(1 - ageRatio, 2) * 0.065;
+        const baseOpacity = intensity * Math.pow(1 - ageRatio, 2) * 0.11;
         if (baseOpacity <= 0.002) continue;
 
         const baseSize = rippleSize * 0.4;

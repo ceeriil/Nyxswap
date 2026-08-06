@@ -16,6 +16,7 @@
     "vercel:login": "vercel login"
   },
   "dependencies": {
+    "@base-ui/react": "^1.6.0",
     "@heroicons/react": "^2.2.0",
     "@rainbow-me/rainbowkit": "2.2.11",
     "@react-native-async-storage/async-storage": "^2.2.0",
@@ -28,11 +29,13 @@
     "@tanstack/react-query": "^5.100.5",
     "blo": "^2.0.0",
     "burner-connector": "0.0.21",
+    "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cobe": "^0.6.3",
     "daisyui": "^5.5.19",
     "gsap": "^3.15.0",
     "kubo-rpc-client": "^6.1.0",
+    "lucide-react": "^1.27.0",
     "motion": "^12.42.2",
     "next": "^16.2.4",
     "next-nprogress-bar": "^2.4.7",

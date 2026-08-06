@@ -1,13 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { RainbowKitProvider, darkTheme, lightTheme } from "@rainbow-me/rainbowkit";
+import { RainbowKitProvider } from "@rainbow-me/rainbowkit";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { AppProgressBar as ProgressBar } from "next-nprogress-bar";
 import { useTheme } from "next-themes";
 import { Toaster } from "react-hot-toast";
 import { WagmiProvider } from "wagmi";
 import { BlockieAvatar } from "~~/components/scaffold-eth";
+import { nyxDarkTheme, nyxLightTheme } from "~~/services/web3/rainbowKitTheme";
 import { wagmiConfig } from "~~/services/web3/wagmiConfig";
 
 export const queryClient = new QueryClient({
@@ -33,7 +34,7 @@ export const ScaffoldEthAppWithProviders = ({ children }: { children: React.Reac
         <ProgressBar height="3px" color="#2299dd" />
         <RainbowKitProvider
           avatar={BlockieAvatar}
-          theme={mounted ? (isDarkMode ? darkTheme() : lightTheme()) : lightTheme()}
+          theme={mounted ? (isDarkMode ? nyxDarkTheme : nyxLightTheme) : nyxLightTheme}
         >
           {children}
           <Toaster />

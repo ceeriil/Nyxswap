@@ -18,8 +18,8 @@ export const LandingHeader = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   return (
-    <header className="sticky top-4 z-40 w-full px-4 lg:px-12">
-      <div className="flex items-center justify-between h-14 px-3 lg:px-4 max-w-4xl mx-auto rounded-full bg-white/5 border border-[#202020] backdrop-blur-md">
+    <header className="fixed top-4 z-40 w-full px-4 lg:px-12">
+      <div className="flex items-center justify-between h-14 w-full px-3 lg:px-4">
         <Link href="/" className="flex items-center gap-2 font-nord text-base tracking-wide text-white">
           <Image src="/logo-new.png" alt="NyxSwap logo" width={36} height={36} className="rounded-full" />
           NYXSWAP

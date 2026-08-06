@@ -17,10 +17,10 @@ const Vault: NextPage = () => {
             Deposit collateral before trading, and withdraw it once you&apos;re done. Escrow balances will show here.
           </p>
           <div className="card-actions justify-end mt-4">
-            <Button as="button" disabled className="rounded-lg">
+            <Button as="button" disabled className="rounded-field">
               Deposit
             </Button>
-            <Button as="button" disabled className="rounded-lg bg-transparent hover:bg-landing-button-bg">
+            <Button as="button" disabled className="rounded-field bg-transparent hover:bg-landing-button-bg">
               Withdraw
             </Button>
           </div>

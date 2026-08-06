@@ -29,10 +29,10 @@ const Verify: NextPage = () => {
               trade itself, and verify a proof someone else has shared with you.
             </p>
             <div className="card-actions justify-end mt-4">
-              <Button as="button" disabled className="rounded-lg">
+              <Button as="button" disabled className="rounded-field">
                 Generate proof
               </Button>
-              <Button as="button" disabled className="rounded-lg bg-transparent hover:bg-landing-button-bg">
+              <Button as="button" disabled className="rounded-field bg-transparent hover:bg-landing-button-bg">
                 Verify a proof
               </Button>
             </div>
