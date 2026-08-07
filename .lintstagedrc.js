@@ -7,15 +7,12 @@ const buildNextEslintCommand = (filenames) =>
 
 const checkTypesNextCommand = () => "yarn next:check-types";
 
-const buildHardhatEslintCommand = (filenames) =>
-  `yarn hardhat:lint-staged --fix ${filenames
-    .map((f) => path.relative(path.join("packages", "hardhat"), f))
-    .join(" ")}`;
+const buildFoundryFormatCommand = () => "yarn foundry:format";
 
 module.exports = {
   "packages/nextjs/**/*.{ts,tsx}": [
     buildNextEslintCommand,
     checkTypesNextCommand,
   ],
-  "packages/hardhat/**/*.{ts,tsx}": [buildHardhatEslintCommand],
+  "packages/foundry/**/*.{sol,js}": [buildFoundryFormatCommand],
 };

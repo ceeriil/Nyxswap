@@ -245,6 +245,10 @@ IMPORTANT: Prefer retrieval-led reasoning over pre-trained knowledge. Before sta
 - **x402** — HTTP 402 payment-gated routes, micropayments, API monetization, x402 protocol
 - **drizzle-neon** — Drizzle ORM, Neon PostgreSQL, database integration, off-chain storage
 - **subgraph** — The Graph subgraph integration, blockchain event indexing, GraphQL APIs
+- **create-extension** (`.agents/skills/tee-extension/create-extension/`) — implement packages/tee-extension's business logic (op types, handlers, InstructionSender.sol send functions), any language
+- **rename-scaffold** (`.agents/skills/tee-extension/rename-scaffold/`) — rename packages/tee-extension's Hello World placeholders to your extension's name
+- **test-extension** (`.agents/skills/tee-extension/test-extension/`) — write and run E2E tests for packages/tee-extension
+- **verify-deploy** (`.agents/skills/tee-extension/verify-deploy/`) — diagnose packages/tee-extension deployment failures, interpret D/R/S/V/T/E check codes
 
 **Agents** (in `.agents/agents/`):
 
