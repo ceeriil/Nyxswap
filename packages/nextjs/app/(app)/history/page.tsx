@@ -10,9 +10,9 @@ export const metadata = getMetadata({
 
 const History: NextPage = () => {
   return (
-    <div className="relative flex flex-1 items-center justify-center px-4 py-16">
+    <div className="relative flex flex-1 justify-center px-4 py-10 lg:py-16">
       <BackgroundLayer />
-      <div className="relative z-10">
+      <div className="relative z-10 w-full max-w-6xl">
         <HistoryTabs />
       </div>
     </div>

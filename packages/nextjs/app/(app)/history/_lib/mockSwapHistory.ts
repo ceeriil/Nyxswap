@@ -13,15 +13,14 @@ export type SwapRecord = {
   amountOut: number;
 };
 
-// Clearly-synthetic addresses (not real accounts) standing in for other
-// traders on the pool until real settled-swap events exist to read.
-const MOCK_TRADERS: Address[] = [
-  "0x1111111111111111111111111111111111aAAA",
-  "0x2222222222222222222222222222222222bBBB",
-  "0x3333333333333333333333333333333333cCCC",
-  "0x4444444444444444444444444444444444dDDD",
-  "0x5555555555555555555555555555555555eEEE",
-];
+const TRADER_COUNT = 40;
+
+// Deterministic, always-valid (40 hex char) synthetic addresses standing in
+// for other traders on the pool until real settled-swap events exist to read.
+const MOCK_TRADERS: Address[] = Array.from(
+  { length: TRADER_COUNT },
+  (_, i) => `0x${(i + 1).toString(16).padStart(40, "0")}` as Address,
+);
 
 const PAIRS: [TokenSymbol, TokenSymbol][] = [
   ["FXRP", "FLR"],
@@ -67,14 +66,15 @@ function buildRecord(seed: number, minutesAgo: number, idPrefix: string): SwapRe
 /**
  * Stand-in settled-swap feed, shaped like what useScaffoldEventHistory would
  * return for a SwapExecuted event once the AMM contract exists (see
- * brief.md) — spread across the last ~36h so the 24h stats bar has real
- * (mock) data to aggregate instead of an invented number.
+ * brief.md). Spread across ~10 days (avg ~24min apart) so the table has
+ * enough rows to exercise sorting/search/pagination/virtualization for real,
+ * while the 24h stats bar still only captures a genuine recent slice.
  */
-export function buildSeedHistory(count = 18): SwapRecord[] {
-  return Array.from({ length: count }, (_, i) => buildRecord(i + 1, i * 65 + Math.floor(Math.random() * 40), "seed"));
+export function buildSeedHistory(count = 240): SwapRecord[] {
+  return Array.from({ length: count }, (_, i) => buildRecord(i + 1, i * 24 + Math.floor(Math.random() * 18), "seed"));
 }
 
-let liveSeedCounter = 100_000;
+let liveSeedCounter = 1_000_000;
 
 /** One freshly "settled" swap, for the live-append demo on Pool Activity. */
 export function buildLiveRecord(): SwapRecord {

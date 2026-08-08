@@ -34,6 +34,8 @@ const FRAGMENT_SHADER = `#version 300 es
   uniform vec2  uResolution;
   uniform float uTime;
   uniform float uPixelSize;
+  uniform vec2  uMouse;
+  uniform float uMouseIntensity;
 
   const int MAX_CLICKS = ${MAX_CLICKS};
   uniform vec2  uClickPos[MAX_CLICKS];
@@ -112,8 +114,18 @@ const FRAGMENT_SHADER = `#version 300 es
     vec2 cellCoord = cellId * cellPixelSize;
     vec2 uv = cellCoord / uResolution * vec2(aspectRatio, 1.0);
 
-    float feed = fbm2(uv, uTime * 0.05);
+    // The whole noise field drifts a little toward the cursor, so existing
+    // clusters visibly shift instead of only a spot lighting up in place.
+    vec2 mouseUV = ((uMouse - uResolution * .5 - cellPixelSize * .5) / uResolution) * vec2(aspectRatio, 1.0);
+    vec2 parallax = (mouseUV - uv) * 0.12 * uMouseIntensity;
+
+    float feed = fbm2(uv + parallax, uTime * 0.05);
     feed = feed * 0.5 - 0.65;
+
+    // Broad proximity boost: cells nearer the cursor get denser, cells far
+    // away stay as-is, so the reaction reads across the whole visible cloud.
+    float mouseDist = distance(uv, mouseUV);
+    feed += exp(-mouseDist * mouseDist * 4.5) * 0.55 * uMouseIntensity;
 
     const float speed = 0.30;
     const float thickness = 0.10;
@@ -202,6 +214,8 @@ export const DiamondDitherBackground = ({
     const pixelSizeLocation = gl.getUniformLocation(program, "uPixelSize");
     const clickPosLocation = gl.getUniformLocation(program, "uClickPos");
     const clickTimesLocation = gl.getUniformLocation(program, "uClickTimes");
+    const mouseLocation = gl.getUniformLocation(program, "uMouse");
+    const mouseIntensityLocation = gl.getUniformLocation(program, "uMouseIntensity");
 
     const vao = gl.createVertexArray();
     gl.bindVertexArray(vao);
@@ -238,10 +252,35 @@ export const DiamondDitherBackground = ({
     };
     canvas.addEventListener("pointerdown", handlePointerDown);
 
+    // Pointer position drives a soft glow in the shader (see uMouse /
+    // uMouseIntensity above). Target values snap on move; the render loop
+    // eases both position and intensity toward them for a trailing feel
+    // and a smooth fade in/out instead of a hard on/off cutoff.
+    const mouseTarget = { x: -1, y: -1 };
+    const mouseSmooth = { x: -1, y: -1 };
+    let mouseIntensityTarget = 0;
+    let mouseIntensitySmooth = 0;
+
+    const handlePointerMove = (e: PointerEvent) => {
+      const rect = canvas.getBoundingClientRect();
+      mouseTarget.x = (e.clientX - rect.left) * (canvas.width / rect.width);
+      mouseTarget.y = (rect.height - (e.clientY - rect.top)) * (canvas.height / rect.height);
+      mouseIntensityTarget = 1;
+    };
+    const handlePointerLeave = () => {
+      mouseIntensityTarget = 0;
+    };
+    canvas.addEventListener("pointermove", handlePointerMove);
+    canvas.addEventListener("pointerleave", handlePointerLeave);
+
     const ink3 = hexToVec3(ink);
     const startTime = performance.now();
 
     const render = () => {
+      mouseSmooth.x += (mouseTarget.x - mouseSmooth.x) * 0.15;
+      mouseSmooth.y += (mouseTarget.y - mouseSmooth.y) * 0.15;
+      mouseIntensitySmooth += (mouseIntensityTarget - mouseIntensitySmooth) * 0.08;
+
       gl.useProgram(program);
       gl.bindVertexArray(vao);
       gl.clearColor(0, 0, 0, 0);
@@ -253,6 +292,8 @@ export const DiamondDitherBackground = ({
       gl.uniform1f(pixelSizeLocation, pixelSize);
       gl.uniform2fv(clickPosLocation, clickPositions.flat());
       gl.uniform1fv(clickTimesLocation, clickTimes);
+      gl.uniform2f(mouseLocation, mouseSmooth.x, mouseSmooth.y);
+      gl.uniform1f(mouseIntensityLocation, mouseIntensitySmooth);
 
       gl.drawArrays(gl.TRIANGLES, 0, 6);
       animationRef.current = requestAnimationFrame(render);
@@ -263,6 +304,8 @@ export const DiamondDitherBackground = ({
     return () => {
       window.removeEventListener("resize", resizeCanvas);
       canvas.removeEventListener("pointerdown", handlePointerDown);
+      canvas.removeEventListener("pointermove", handlePointerMove);
+      canvas.removeEventListener("pointerleave", handlePointerLeave);
       if (animationRef.current) cancelAnimationFrame(animationRef.current);
       gl.deleteProgram(program);
       gl.deleteShader(vertexShader);

@@ -12,7 +12,7 @@ export const Hero = () => {
           Swap back to <VortexTwist /> below if this doesn't work out. */}
       <DiamondDitherBackground className="absolute inset-0 -z-10 h-full w-full" />
       {/* <VortexTwist className="absolute inset-0 -z-10 h-full w-full " /> */}
-      <span className="font-nord text-landing-muted text-xs md:text-sm tracking-[0.2em] uppercase mb-6 mt-16">
+      <span className="font-nord text-white text-xs md:text-sm tracking-[0.2em] uppercase mb-6 mt-16">
         Confidential order flow on Flare
       </span>
 

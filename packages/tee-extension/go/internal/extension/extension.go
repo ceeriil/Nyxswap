@@ -1,36 +1,64 @@
 package extension
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"sync"
+	"sync/atomic"
+	"time"
 
 	"extension-scaffold/internal/config"
+	"extension-scaffold/pkg/balance"
+	"extension-scaffold/pkg/orderbook"
 	"extension-scaffold/pkg/types"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/flare-foundation/go-flare-common/pkg/tee/instruction"
-	"github.com/flare-foundation/go-flare-common/pkg/tee/structs"
 	teetypes "github.com/flare-foundation/tee-node/pkg/types"
 	teeutils "github.com/flare-foundation/tee-node/pkg/utils"
 
 	"github.com/flare-foundation/tee-node/pkg/processorutils"
 )
 
+// Extension is the dark-pool trading extension handler. Orderbooks, balances,
+// and everything about who's trading what live only here, in TEE memory —
+// see NyxSwapVault.sol's header for why that's the point.
 type Extension struct {
 	mu     sync.RWMutex
 	Server *http.Server
 
-	greetingCount int
-	lastGreeting  string
-	farewellCount int
-	lastFarewell  string
+	orderbooks map[string]*orderbook.OrderBook     // pair name -> orderbook
+	balances   *balance.Manager                    // per-(user, token) balances
+	pairs      map[string]config.TradingPairConfig // pair name -> token addresses
+	orders     map[string]string                   // orderID -> pair (for cancel routing)
+	userOrders map[string][]string                 // user address -> list of orderIDs
+
+	history           *History        // bounded per-user deposit/withdrawal history
+	signPort          int             // TEE sign server port, for issueWithdrawal's signWithTEE
+	fsa               *fsaStore       // FSA session-key bindings + replay nonces
+	instructionSender common.Address  // this deployment's InstructionSender, for requireBoundContract
 }
 
-// --- DO NOT MODIFY: New(), actionHandler() are boilerplate.
+// --- DO NOT MODIFY: New(), actionHandler() structure is boilerplate. ---
 func New(extensionPort, signPort int) *Extension {
-	e := &Extension{}
+	e := &Extension{
+		orderbooks: make(map[string]*orderbook.OrderBook),
+		balances:   balance.NewManager(),
+		pairs:      make(map[string]config.TradingPairConfig),
+		orders:     make(map[string]string),
+		userOrders: make(map[string][]string),
+
+		history:           newHistory(),
+		signPort:          signPort,
+		fsa:               newFsaStore(),
+		instructionSender: common.HexToAddress(config.InstructionSender),
+	}
+
+	for _, pair := range config.TradingPairs {
+		e.pairs[pair.Name] = pair
+		e.orderbooks[pair.Name] = orderbook.NewOrderBook(pair.Name)
+	}
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /state", e.stateHandler)
@@ -40,16 +68,15 @@ func New(extensionPort, signPort int) *Extension {
 	return e
 }
 
-// stateHandler() structure is boilerplate but update the State field mapping to match your Extension fields.
+// stateHandler reports minimal, non-sensitive extension state. No balances,
+// no order/match data — those are user-scoped and only ever answered via
+// GET_MY_STATE, never this unauthenticated endpoint.
 func (e *Extension) stateHandler(w http.ResponseWriter, r *http.Request) {
 	e.mu.RLock()
 	stateResponse := types.StateResponse{
 		StateVersion: teeutils.ToHash(config.Version),
 		State: types.State{
-			GreetingCount: e.greetingCount,
-			LastGreeting:  e.lastGreeting,
-			FarewellCount: e.farewellCount,
-			LastFarewell:  e.lastFarewell,
+			ConfiguredPairs: len(e.pairs),
 		},
 	}
 	e.mu.RUnlock()
@@ -61,101 +88,111 @@ func (e *Extension) stateHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// processAction routes by action type (instruction vs direct) and then by
+// OPType/OPCommand.
 func (e *Extension) processAction(action teetypes.Action) (int, []byte) {
-	dataFixed, err := processorutils.Parse[instruction.DataFixed](action.Data.Message)
+	switch action.Data.Type {
+	case teetypes.Instruction:
+		return e.processInstruction(action)
+	case teetypes.Direct:
+		return e.processDirect(action)
+	default:
+		return http.StatusBadRequest, []byte(fmt.Sprintf("unsupported action type: %s", action.Data.Type))
+	}
+}
+
+// processInstruction handles on-chain instruction actions (DEPOSIT, WITHDRAW).
+// FSA_OP's inner ops beyond WITHDRAW_REQUEST (BIND_SESSION_SIG, GET_BINDING)
+// aren't implemented yet — see fsa.go's doc comment for why — so FSA_OP
+// itself isn't dispatched here either; WITHDRAW_REQUEST is reached via the
+// Direct path in processDirect instead, matching how the reference exposes it.
+func (e *Extension) processInstruction(action teetypes.Action) (int, []byte) {
+	df, err := processorutils.Parse[instruction.DataFixed](action.Data.Message)
 	if err != nil {
 		return http.StatusBadRequest, []byte(fmt.Sprintf("decoding fixed data: %v", err))
 	}
 
-	switch {
-	case dataFixed.OPType == teeutils.ToHash(config.OPTypeGreeting):
-		return e.processGreeting(action, dataFixed)
-
-	default:
+	if df.OPType != teeutils.ToHash(config.OPTypeTrading) {
 		return http.StatusNotImplemented, []byte(fmt.Sprintf(
 			"unsupported op type: received %s, expected %s (%s)",
-			dataFixed.OPType.Hex(), teeutils.ToHash(config.OPTypeGreeting).Hex(), config.OPTypeGreeting,
+			df.OPType.Hex(), teeutils.ToHash(config.OPTypeTrading).Hex(), config.OPTypeTrading,
 		))
 	}
-}
 
-// processGreeting routes GREETING instructions by OPCommand.
-func (e *Extension) processGreeting(action teetypes.Action, df *instruction.DataFixed) (int, []byte) {
+	var ar teetypes.ActionResult
+
 	switch {
-	case df.OPCommand == teeutils.ToHash(config.OPCommandSayHello):
-		ar := e.processSayHello(action, df)
-		b, _ := json.Marshal(ar)
-		return http.StatusOK, b
-
-	case df.OPCommand == teeutils.ToHash(config.OPCommandSayGoodbye):
-		ar := e.processSayGoodbye(action, df)
-		b, _ := json.Marshal(ar)
-		return http.StatusOK, b
-
+	case df.OPCommand == teeutils.ToHash(config.OPCommandDeposit):
+		ar = e.processDeposit(action, df)
+	case df.OPCommand == teeutils.ToHash(config.OPCommandWithdraw):
+		ar = e.processWithdraw(action, df)
 	default:
 		return http.StatusNotImplemented, []byte(fmt.Sprintf(
-			"unsupported op command: received %s, expected one of [%s (%s), %s (%s)]",
-			df.OPCommand.Hex(),
-			teeutils.ToHash(config.OPCommandSayHello).Hex(), config.OPCommandSayHello,
-			teeutils.ToHash(config.OPCommandSayGoodbye).Hex(), config.OPCommandSayGoodbye,
+			"unsupported instruction op command: %s", df.OPCommand.Hex(),
 		))
 	}
+
+	b, _ := json.Marshal(ar)
+	return http.StatusOK, b
 }
 
-// processSayHello handles SAY_HELLO instructions: returns a greeting and tracks count.
-func (e *Extension) processSayHello(action teetypes.Action, df *instruction.DataFixed) teetypes.ActionResult {
-	var req types.SayHelloRequest
-	dec := json.NewDecoder(bytes.NewReader(df.OriginalMessage))
-	dec.DisallowUnknownFields()
-	err := dec.Decode(&req)
+// processDirect handles off-chain direct actions — order placement,
+// cancellation, and (once implemented) state/history queries.
+func (e *Extension) processDirect(action teetypes.Action) (int, []byte) {
+	di, err := processorutils.Parse[teetypes.DirectInstruction](action.Data.Message)
 	if err != nil {
-		return buildResult(action, df, nil, 0, fmt.Errorf("decoding request: %w", err))
+		return http.StatusBadRequest, []byte(fmt.Sprintf("decoding direct instruction: %v", err))
 	}
 
-	if req.Name == "" {
-		return buildResult(action, df, nil, 0, fmt.Errorf("name must not be empty"))
+	if di.OPType != teeutils.ToHash(config.OPTypeTrading) {
+		return http.StatusNotImplemented, []byte(fmt.Sprintf(
+			"unsupported op type: received %s, expected %s (%s)",
+			di.OPType.Hex(), teeutils.ToHash(config.OPTypeTrading).Hex(), config.OPTypeTrading,
+		))
 	}
 
-	e.mu.Lock()
-	e.greetingCount++
-	greetingNumber := e.greetingCount
-	greeting := fmt.Sprintf("Hello, %s! Welcome to Flare Confidential Compute.", req.Name)
-	e.lastGreeting = greeting
-	e.mu.Unlock()
-
-	resp := types.SayHelloResponse{
-		Greeting:       greeting,
-		GreetingNumber: greetingNumber,
+	df := &instruction.DataFixed{
+		InstructionID: action.Data.ID,
+		OPType:        di.OPType,
+		OPCommand:     di.OPCommand,
 	}
-	data, _ := json.Marshal(resp)
 
-	return buildResult(action, df, data, 1, nil)
+	var ar teetypes.ActionResult
+
+	switch {
+	case di.OPCommand == teeutils.ToHash(config.OPCommandPlaceOrder):
+		ar = e.processPlaceOrder(action, df, di.Message)
+	case di.OPCommand == teeutils.ToHash(config.OPCommandCancelOrder):
+		ar = e.processCancelOrder(action, df, di.Message)
+	case di.OPCommand == teeutils.ToHash(config.OPCommandWithdrawRequest):
+		ar = e.processWithdrawRequest(action, df, di.Message)
+	default:
+		return http.StatusNotImplemented, []byte(fmt.Sprintf(
+			"unsupported direct op command: %s", di.OPCommand.Hex(),
+		))
+	}
+
+	b, _ := json.Marshal(ar)
+	return http.StatusOK, b
 }
 
-// processSayGoodbye handles SAY_GOODBYE instructions: returns a farewell and tracks count.
-func (e *Extension) processSayGoodbye(action teetypes.Action, df *instruction.DataFixed) teetypes.ActionResult {
-	var req types.SayGoodbyeRequest
-	err := structs.DecodeTo(types.SayGoodbyeMessageArg, df.OriginalMessage, &req)
-	if err != nil {
-		return buildResult(action, df, nil, 0, fmt.Errorf("decoding request: %w", err))
+// removeUserOrder removes an orderID from the user's order list.
+// Caller must hold e.mu.Lock().
+func (e *Extension) removeUserOrder(user, orderID string) {
+	ids := e.userOrders[user]
+	for i, id := range ids {
+		if id == orderID {
+			e.userOrders[user] = append(ids[:i], ids[i+1:]...)
+			return
+		}
 	}
+}
 
-	if req.Name == "" {
-		return buildResult(action, df, nil, 0, fmt.Errorf("name must not be empty"))
-	}
+// nextOrderID generates a unique order ID. Concurrent-safe: the counter is
+// incremented atomically and combined with a nanosecond timestamp.
+var orderCounter atomic.Uint64
 
-	e.mu.Lock()
-	e.farewellCount++
-	farewellNumber := e.farewellCount
-	farewell := fmt.Sprintf("Goodbye, %s! Reason: %s", req.Name, req.Reason)
-	e.lastFarewell = farewell
-	e.mu.Unlock()
-
-	resp := types.SayGoodbyeResponse{
-		Farewell:       farewell,
-		FarewellNumber: farewellNumber,
-	}
-	data, _ := json.Marshal(resp)
-
-	return buildResult(action, df, data, 1, nil)
+func (e *Extension) nextOrderID() string {
+	n := orderCounter.Add(1)
+	return fmt.Sprintf("ORD-%d-%d", time.Now().UnixNano(), n)
 }
