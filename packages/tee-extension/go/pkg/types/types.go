@@ -130,6 +130,23 @@ type PlaceOrderResponse struct {
 	Status    string            `json:"status"` // "filled", "partial", "resting"
 	Matches   []orderbook.Match `json:"matches,omitempty"`
 	Remaining uint64            `json:"remaining"`
+	PoolFill  *PoolFillResponse `json:"poolFill,omitempty"`
+}
+
+// PoolFillResponse is a TEE-signed authorization for NyxSwapVault.fillFromPool,
+// covering whatever quantity of an order the orderbook couldn't match
+// peer-to-peer. Same "TEE signs, anyone relays" pattern as WithdrawResponse:
+// this JSON is public and carriable by any third party, and it authorizes
+// nothing except exactly this (pool, aToB, amountIn, minAmountOut) swap, once,
+// pulling from the vault's own custody — never bound to the trader on-chain.
+type PoolFillResponse struct {
+	FillID       common.Hash    `json:"fillId"`
+	Pool         common.Address `json:"pool"`
+	AToB         bool           `json:"aToB"`
+	AmountIn     uint64         `json:"amountIn"`
+	MinAmountOut uint64         `json:"minAmountOut"`
+	AmountOut    uint64         `json:"amountOut"`
+	Signature    hexutil.Bytes  `json:"signature"`
 }
 
 // --- Cancel Order (off-chain direct action) ---

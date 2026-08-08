@@ -113,6 +113,34 @@ func TestRelease_InsufficientHeld(t *testing.T) {
 	}
 }
 
+func TestSpendHeld(t *testing.T) {
+	m := NewManager()
+	_ = m.Deposit(user1, tokenA, 1000)
+	_ = m.Hold(user1, tokenA, 300)
+
+	if err := m.SpendHeld(user1, tokenA, 200); err != nil {
+		t.Fatal(err)
+	}
+
+	bal := m.Get(user1, tokenA)
+	if bal.Held != 100 {
+		t.Fatalf("expected held 100, got %d", bal.Held)
+	}
+	if bal.Available != 700 {
+		t.Fatalf("expected available unchanged at 700, got %d", bal.Available)
+	}
+}
+
+func TestSpendHeld_InsufficientHeld(t *testing.T) {
+	m := NewManager()
+	_ = m.Deposit(user1, tokenA, 1000)
+	_ = m.Hold(user1, tokenA, 100)
+
+	if err := m.SpendHeld(user1, tokenA, 200); err != ErrInsufficientHeld {
+		t.Fatalf("expected ErrInsufficientHeld, got %v", err)
+	}
+}
+
 func TestTransfer(t *testing.T) {
 	m := NewManager()
 	_ = m.Deposit(user1, tokenA, 1000)

@@ -118,6 +118,25 @@ func (m *Manager) Transfer(from, to string, token common.Address, amount uint64)
 	return m.save()
 }
 
+// SpendHeld debits held funds without crediting anything back — used when
+// held funds leave the TEE-tracked ledger entirely via a different path than
+// Transfer's peer-to-peer settlement, e.g. a pool-fallback fill where the
+// input token is swapped on-chain and the output token is credited
+// separately via Deposit once the swap's outcome is known.
+func (m *Manager) SpendHeld(user string, token common.Address, amount uint64) error {
+	if amount == 0 {
+		return ErrZeroAmount
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	tb := m.getOrCreate(user, token)
+	if tb.Held < amount {
+		return ErrInsufficientHeld
+	}
+	tb.Held -= amount
+	return m.save()
+}
+
 // Get returns a copy of the user's balance for a single token.
 func (m *Manager) Get(user string, token common.Address) TokenBalance {
 	m.mu.RLock()

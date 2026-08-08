@@ -56,18 +56,29 @@ var (
 
 	// FSA support. ChainURL is required for BIND_SESSION_SIG (PersonalAccount
 	// resolution via the MasterAccountController); without it FSA ops are
-	// disabled. InstructionSender pins signed off-chain requests to this
-	// deployment (from config/extension.env via the compose env_file).
+	// disabled. ChainURL doubles as the read-only RPC endpoint the pool
+	// fallback (see internal/extension/chain.go) uses to quote live pool
+	// reserves — without it, pool fallback is disabled the same way FSA is.
+	// InstructionSender pins signed off-chain requests to this deployment
+	// (from config/extension.env via the compose env_file). VaultAddress is
+	// the NyxSwapVault this TEE signs fillFromPool/withdraw authorizations
+	// for — it's the contract address hashed into those signatures, distinct
+	// from InstructionSender.
 	ChainURL                string
 	MasterAccountController = DefaultMasterAccountController
 	InstructionSender       string
+	VaultAddress            string
 )
 
-// TradingPairConfig maps a pair name to its base and quote token addresses.
+// TradingPairConfig maps a pair name to its base/quote token addresses and
+// the on-chain pool used as a fallback for whatever the orderbook can't
+// match peer-to-peer. PoolAddress may be the zero address, meaning this pair
+// has no pool fallback configured — unmatched remainders just rest.
 type TradingPairConfig struct {
-	Name       string         `json:"name"`
-	BaseToken  common.Address `json:"baseToken"`
-	QuoteToken common.Address `json:"quoteToken"`
+	Name        string         `json:"name"`
+	BaseToken   common.Address `json:"baseToken"`
+	QuoteToken  common.Address `json:"quoteToken"`
+	PoolAddress common.Address `json:"poolAddress"`
 }
 
 // LoadTradingPairs reads a JSON file of trading pair configs.
@@ -116,6 +127,9 @@ func init() {
 	}
 	if v := os.Getenv("INSTRUCTION_SENDER"); v != "" {
 		InstructionSender = v
+	}
+	if v := os.Getenv("VAULT_ADDRESS"); v != "" {
+		VaultAddress = v
 	}
 	if v := os.Getenv("ADMIN_ADDRESSES"); v != "" {
 		for _, addr := range strings.Split(v, ",") {

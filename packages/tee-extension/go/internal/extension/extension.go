@@ -4,16 +4,19 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"sync"
-	"sync/atomic"
-	"time"
 
 	"extension-scaffold/internal/config"
+	"extension-scaffold/internal/extension/fsa"
+	"extension-scaffold/internal/extension/history"
+	"extension-scaffold/internal/extension/matching"
+	"extension-scaffold/internal/extension/poolfallback"
+	"extension-scaffold/internal/extension/teesign"
+	"extension-scaffold/internal/extension/vault"
 	"extension-scaffold/pkg/balance"
-	"extension-scaffold/pkg/orderbook"
 	"extension-scaffold/pkg/types"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/flare-foundation/go-flare-common/pkg/logger"
 	"github.com/flare-foundation/go-flare-common/pkg/tee/instruction"
 	teetypes "github.com/flare-foundation/tee-node/pkg/types"
 	teeutils "github.com/flare-foundation/tee-node/pkg/utils"
@@ -21,43 +24,46 @@ import (
 	"github.com/flare-foundation/tee-node/pkg/processorutils"
 )
 
-// Extension is the dark-pool trading extension handler. Orderbooks, balances,
-// and everything about who's trading what live only here, in TEE memory —
-// see NyxSwapVault.sol's header for why that's the point.
+// Extension is the dark-pool trading extension's dispatch root. It owns no
+// state of its own — every piece of mutable TEE state (balances, the
+// matching engine, FSA bindings, deposit/withdrawal history) lives in one
+// of its component packages, each guarding itself. Extension's only job is
+// routing an incoming Action to the right component and wrapping the
+// result back into the wire format.
 type Extension struct {
-	mu     sync.RWMutex
 	Server *http.Server
 
-	orderbooks map[string]*orderbook.OrderBook     // pair name -> orderbook
-	balances   *balance.Manager                    // per-(user, token) balances
-	pairs      map[string]config.TradingPairConfig // pair name -> token addresses
-	orders     map[string]string                   // orderID -> pair (for cancel routing)
-	userOrders map[string][]string                 // user address -> list of orderIDs
-
-	history           *History        // bounded per-user deposit/withdrawal history
-	signPort          int             // TEE sign server port, for issueWithdrawal's signWithTEE
-	fsa               *fsaStore       // FSA session-key bindings + replay nonces
-	instructionSender common.Address  // this deployment's InstructionSender, for requireBoundContract
+	vault    *vault.Handler   // DEPOSIT/WITHDRAW/WITHDRAW_REQUEST against NyxSwapVault
+	matching *matching.Engine // PLACE_ORDER/CANCEL_ORDER trading engine
 }
 
 // --- DO NOT MODIFY: New(), actionHandler() structure is boilerplate. ---
 func New(extensionPort, signPort int) *Extension {
-	e := &Extension{
-		orderbooks: make(map[string]*orderbook.OrderBook),
-		balances:   balance.NewManager(),
-		pairs:      make(map[string]config.TradingPairConfig),
-		orders:     make(map[string]string),
-		userOrders: make(map[string][]string),
+	balances := balance.NewManager()
+	signer := teesign.NewClient(signPort)
+	instructionSender := common.HexToAddress(config.InstructionSender)
+	vaultAddress := common.HexToAddress(config.VaultAddress)
 
-		history:           newHistory(),
-		signPort:          signPort,
-		fsa:               newFsaStore(),
-		instructionSender: common.HexToAddress(config.InstructionSender),
+	vaultHandler := vault.New(balances, history.NewStore(), fsa.NewStore(), signer.Sign, instructionSender)
+
+	pairs := make(map[string]config.TradingPairConfig, len(config.TradingPairs))
+	for _, pair := range config.TradingPairs {
+		pairs[pair.Name] = pair
 	}
 
-	for _, pair := range config.TradingPairs {
-		e.pairs[pair.Name] = pair
-		e.orderbooks[pair.Name] = orderbook.NewOrderBook(pair.Name)
+	// Pool fallback is optional: a dial failure or unset CHAIN_URL disables
+	// it (poolFallback stays nil), it never blocks extension startup.
+	var poolFallback *poolfallback.Fallback
+	reader, err := poolfallback.Dial(config.ChainURL)
+	if err != nil {
+		logger.Infof("pool fallback disabled: %v", err)
+	} else {
+		poolFallback = poolfallback.New(reader, vaultAddress, signer.Sign)
+	}
+
+	e := &Extension{
+		vault:    vaultHandler,
+		matching: matching.New(pairs, balances, poolFallback),
 	}
 
 	mux := http.NewServeMux()
@@ -72,14 +78,12 @@ func New(extensionPort, signPort int) *Extension {
 // no order/match data — those are user-scoped and only ever answered via
 // GET_MY_STATE, never this unauthenticated endpoint.
 func (e *Extension) stateHandler(w http.ResponseWriter, r *http.Request) {
-	e.mu.RLock()
 	stateResponse := types.StateResponse{
 		StateVersion: teeutils.ToHash(config.Version),
 		State: types.State{
-			ConfiguredPairs: len(e.pairs),
+			ConfiguredPairs: e.matching.PairCount(),
 		},
 	}
-	e.mu.RUnlock()
 
 	err := json.NewEncoder(w).Encode(stateResponse)
 	if err != nil {
@@ -103,9 +107,10 @@ func (e *Extension) processAction(action teetypes.Action) (int, []byte) {
 
 // processInstruction handles on-chain instruction actions (DEPOSIT, WITHDRAW).
 // FSA_OP's inner ops beyond WITHDRAW_REQUEST (BIND_SESSION_SIG, GET_BINDING)
-// aren't implemented yet — see fsa.go's doc comment for why — so FSA_OP
-// itself isn't dispatched here either; WITHDRAW_REQUEST is reached via the
-// Direct path in processDirect instead, matching how the reference exposes it.
+// aren't implemented yet — see the fsa package's doc comment for why — so
+// FSA_OP itself isn't dispatched here either; WITHDRAW_REQUEST is reached
+// via the Direct path in processDirect instead, matching how the reference
+// exposes it.
 func (e *Extension) processInstruction(action teetypes.Action) (int, []byte) {
 	df, err := processorutils.Parse[instruction.DataFixed](action.Data.Message)
 	if err != nil {
@@ -174,25 +179,4 @@ func (e *Extension) processDirect(action teetypes.Action) (int, []byte) {
 
 	b, _ := json.Marshal(ar)
 	return http.StatusOK, b
-}
-
-// removeUserOrder removes an orderID from the user's order list.
-// Caller must hold e.mu.Lock().
-func (e *Extension) removeUserOrder(user, orderID string) {
-	ids := e.userOrders[user]
-	for i, id := range ids {
-		if id == orderID {
-			e.userOrders[user] = append(ids[:i], ids[i+1:]...)
-			return
-		}
-	}
-}
-
-// nextOrderID generates a unique order ID. Concurrent-safe: the counter is
-// incremented atomically and combined with a nanosecond timestamp.
-var orderCounter atomic.Uint64
-
-func (e *Extension) nextOrderID() string {
-	n := orderCounter.Add(1)
-	return fmt.Sprintf("ORD-%d-%d", time.Now().UnixNano(), n)
 }
