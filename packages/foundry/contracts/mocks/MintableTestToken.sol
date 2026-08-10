@@ -3,9 +3,9 @@ pragma solidity ^0.8.27;
 
 import { IERC20 } from "../interfaces/IERC20.sol";
 
-/// @title FlrTestToken — Minimal mintable ERC20 for testnet faucets.
+/// @title MintableTestToken — Minimal mintable ERC20 for testnet faucets.
 /// @dev Anyone can mint to anyone. Do NOT use in production.
-contract FlrTestToken is IERC20 {
+contract MintableTestToken is IERC20 {
     string public name;
     string public symbol;
     uint8 public immutable decimals;
