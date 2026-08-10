@@ -9,6 +9,13 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 )
 
+// testVault/testPool are shared across the Try-related tests below, which
+// don't care what the addresses actually are.
+var (
+	testVault = common.HexToAddress("0xAAAA")
+	testPool  = common.HexToAddress("0xBBBB")
+)
+
 type stubReader struct {
 	reserveA, reserveB *big.Int
 	err                error
@@ -71,14 +78,14 @@ func TestTry_Favorable(t *testing.T) {
 	signCalls := 0
 	f := &Fallback{
 		reader: stubReader{reserveA: big.NewInt(1_000_000), reserveB: big.NewInt(2_000_000)},
-		vault:  common.HexToAddress("0xAAAA"),
+		vault:  testVault,
 		sign: func(message []byte) ([]byte, error) {
 			signCalls++
 			return []byte{1, 2, 3}, nil
 		},
 	}
 
-	resp, err := f.Try(context.Background(), common.HexToAddress("0xBBBB"), true, 10_000, 1, "order-1")
+	resp, err := f.Try(context.Background(), testPool, true, 10_000, 1, "order-1")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -100,7 +107,7 @@ func TestTry_NotFavorable(t *testing.T) {
 	signCalled := false
 	f := &Fallback{
 		reader: stubReader{reserveA: big.NewInt(100), reserveB: big.NewInt(100)},
-		vault:  common.HexToAddress("0xAAAA"),
+		vault:  testVault,
 		sign: func(message []byte) ([]byte, error) {
 			signCalled = true
 			return nil, nil
@@ -108,7 +115,7 @@ func TestTry_NotFavorable(t *testing.T) {
 	}
 
 	// Asking for far more out than these thin reserves could ever quote.
-	resp, err := f.Try(context.Background(), common.HexToAddress("0xBBBB"), true, 10_000, 1_000_000, "order-2")
+	resp, err := f.Try(context.Background(), testPool, true, 10_000, 1_000_000, "order-2")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -127,7 +134,7 @@ func TestTry_VaultNotConfigured(t *testing.T) {
 		sign:   func(message []byte) ([]byte, error) { return []byte{1}, nil },
 	}
 
-	_, err := f.Try(context.Background(), common.HexToAddress("0xBBBB"), true, 10_000, 1, "order-1")
+	_, err := f.Try(context.Background(), testPool, true, 10_000, 1, "order-1")
 	if err == nil {
 		t.Fatal("expected an error when the vault address isn't configured")
 	}
@@ -137,11 +144,11 @@ func TestTry_ReaderError(t *testing.T) {
 	wantErr := errors.New("rpc down")
 	f := &Fallback{
 		reader: stubReader{err: wantErr},
-		vault:  common.HexToAddress("0xAAAA"),
+		vault:  testVault,
 		sign:   func(message []byte) ([]byte, error) { return nil, nil },
 	}
 
-	_, err := f.Try(context.Background(), common.HexToAddress("0xBBBB"), true, 10, 1, "order-3")
+	_, err := f.Try(context.Background(), testPool, true, 10, 1, "order-3")
 	if err == nil {
 		t.Fatal("expected an error when the reserve read fails")
 	}

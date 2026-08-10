@@ -12,11 +12,11 @@ import (
 // (nil, nil) — not an error — when a pair has no pool address, the normal
 // case for any pair that hasn't opted into pool fallback.
 func TestTryPoolFill_NoPoolConfigured(t *testing.T) {
-	e, _ := newTestEngine("FXRP/FLR", common.HexToAddress("0x11"), common.HexToAddress("0x22"))
-	pairCfg := e.pairs["FXRP/FLR"] // PoolAddress left zero
+	e, _ := newTestEngine()
+	pairCfg := e.pairs[testPair] // PoolAddress left zero
 
 	order := &orderbook.Order{
-		ID: "ORD-1", Owner: "seller", Pair: "FXRP/FLR",
+		ID: "ORD-1", Owner: testSeller, Pair: testPair,
 		Side: orderbook.Sell, Price: 2_000_000, Quantity: 100, Remaining: 100,
 	}
 
@@ -34,13 +34,13 @@ func TestTryPoolFill_NoPoolConfigured(t *testing.T) {
 // (e.g. CHAIN_URL unset). Pool fallback degrades to "just rest it", never a
 // hard failure.
 func TestTryPoolFill_NoFallbackConfigured(t *testing.T) {
-	e, _ := newTestEngine("FXRP/FLR", common.HexToAddress("0x11"), common.HexToAddress("0x22"))
-	pairCfg := e.pairs["FXRP/FLR"]
+	e, _ := newTestEngine()
+	pairCfg := e.pairs[testPair]
 	pairCfg.PoolAddress = common.HexToAddress("0x33")
-	e.pairs["FXRP/FLR"] = pairCfg
+	e.pairs[testPair] = pairCfg
 
 	order := &orderbook.Order{
-		ID: "ORD-2", Owner: "seller", Pair: "FXRP/FLR",
+		ID: "ORD-2", Owner: testSeller, Pair: testPair,
 		Side: orderbook.Sell, Price: 2_000_000, Quantity: 100, Remaining: 100,
 	}
 

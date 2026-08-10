@@ -121,6 +121,43 @@
   background: var(--color-base-200);
 }
 
+/*
+  @scaffold-ui/components (AddressInput, EtherInput, etc.) ships its own
+  "sui-*" design tokens with a hardcoded dark palette (navy background/
+  border) and every component wrapper force-applies Tailwind's generic
+  `font-sans` class (see ComponentWrapper.js's DefaultStylesWrapper) —
+  neither knows about this app's black-and-silver theme or NeueMontreal
+  body font above. Its light-mode colors already match ours exactly, so
+  only dark needs remapping. `--font-sans` is Tailwind's own built-in
+  token (not sui-specific), and nothing else in this app uses it — the app
+  applies font-neue/font-nord directly instead — so redefining it here
+  only affects the scaffold-ui package's own components, letting them pick
+  up our body font with no per-component class hook needed.
+  [data-theme="dark"] beats the package's compiled selector on specificity
+  (it's built from :where(), which is always zero-specificity), so no
+  !important is needed here.
+  See node_modules/@scaffold-ui/components/dist/styles.css.
+*/
+[data-theme="dark"] {
+  --color-sui-primary: var(--color-base-300);
+  --color-sui-primary-subtle: var(--color-base-300);
+  --color-sui-primary-neutral: var(--color-base-300);
+  --color-sui-primary-content: var(--color-base-content);
+  --color-sui-accent: var(--color-accent);
+  --color-sui-base-content: var(--color-base-content);
+  --font-sans: var(--font-neue);
+}
+
+/*
+  The package's input wrapper (BaseInput.js) has no border-radius at all —
+  not themeable, not overridable via a token, just absent. Hooking its
+  compiled border-color class directly, since that's the only stable
+  selector available without patching the dependency.
+*/
+.border-sui-input-border {
+  border-radius: var(--radius-field);
+}
+
 .btn {
   box-shadow: none;
 }

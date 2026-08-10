@@ -3,9 +3,6 @@ package vault
 import (
 	"testing"
 
-	"extension-scaffold/internal/extension/fsa"
-	"extension-scaffold/internal/extension/history"
-	"extension-scaffold/pkg/balance"
 	"extension-scaffold/pkg/types"
 
 	"github.com/ethereum/go-ethereum/accounts"
@@ -44,23 +41,20 @@ func signWithdrawRequest(t *testing.T, priv *ecdsaKey, contract, token, to commo
 
 func TestHandler_WithdrawRequest_SelfSigned(t *testing.T) {
 	priv := newTestKey(t)
-	contract := common.HexToAddress("0xC0FFEE")
-	token := common.HexToAddress("0xBBBB")
-	to := common.HexToAddress("0xCCCC")
 
-	balances := balance.NewManager()
+	signCalls := 0
+	h, balances := newHandlerWithSigner(func(message []byte) ([]byte, error) {
+		signCalls++
+		return []byte{1, 2, 3}, nil
+	})
+	h.instructionSender = testContract
+
 	user := crypto.PubkeyToAddress(priv.key.PublicKey)
-	if err := balances.Deposit(userKey(user), token, 1_000); err != nil {
+	if err := balances.Deposit(userKey(user), testToken, 1_000); err != nil {
 		t.Fatal(err)
 	}
 
-	signCalls := 0
-	h := New(balances, history.NewStore(), fsa.NewStore(), func(message []byte) ([]byte, error) {
-		signCalls++
-		return []byte{1, 2, 3}, nil
-	}, contract)
-
-	req := signWithdrawRequest(t, priv, contract, token, to, 400, 1)
+	req := signWithdrawRequest(t, priv, testContract, testToken, testTo, 400, 1)
 	resp, err := h.WithdrawRequest(req, common.HexToHash("0x99"))
 	if err != nil {
 		t.Fatal(err)
@@ -75,15 +69,12 @@ func TestHandler_WithdrawRequest_SelfSigned(t *testing.T) {
 
 func TestHandler_WithdrawRequest_WrongContractRejected(t *testing.T) {
 	priv := newTestKey(t)
-	configuredContract := common.HexToAddress("0xC0FFEE")
 	wrongContract := common.HexToAddress("0xBADBAD")
-	token := common.HexToAddress("0xBBBB")
-	to := common.HexToAddress("0xCCCC")
 
 	h, _ := newHandlerWithSigner(func(message []byte) ([]byte, error) { return []byte{1}, nil })
-	h.instructionSender = configuredContract
+	h.instructionSender = testContract
 
-	req := signWithdrawRequest(t, priv, wrongContract, token, to, 100, 1)
+	req := signWithdrawRequest(t, priv, wrongContract, testToken, testTo, 100, 1)
 	if _, err := h.WithdrawRequest(req, common.HexToHash("0x1")); err == nil {
 		t.Fatal("expected an error for a request signed against the wrong contract")
 	}
@@ -91,26 +82,23 @@ func TestHandler_WithdrawRequest_WrongContractRejected(t *testing.T) {
 
 func TestHandler_WithdrawRequest_ReplayedNonceRejected(t *testing.T) {
 	priv := newTestKey(t)
-	contract := common.HexToAddress("0xC0FFEE")
-	token := common.HexToAddress("0xBBBB")
-	to := common.HexToAddress("0xCCCC")
 
-	balances := balance.NewManager()
+	h, balances := newHandlerWithSigner(func(message []byte) ([]byte, error) {
+		return []byte{1}, nil
+	})
+	h.instructionSender = testContract
+
 	user := crypto.PubkeyToAddress(priv.key.PublicKey)
-	if err := balances.Deposit(userKey(user), token, 1_000); err != nil {
+	if err := balances.Deposit(userKey(user), testToken, 1_000); err != nil {
 		t.Fatal(err)
 	}
 
-	h := New(balances, history.NewStore(), fsa.NewStore(), func(message []byte) ([]byte, error) {
-		return []byte{1}, nil
-	}, contract)
-
-	req := signWithdrawRequest(t, priv, contract, token, to, 100, 1)
+	req := signWithdrawRequest(t, priv, testContract, testToken, testTo, 100, 1)
 	if _, err := h.WithdrawRequest(req, common.HexToHash("0x1")); err != nil {
 		t.Fatalf("first request should succeed, got %v", err)
 	}
 
-	replay := signWithdrawRequest(t, priv, contract, token, to, 100, 1) // same nonce
+	replay := signWithdrawRequest(t, priv, testContract, testToken, testTo, 100, 1) // same nonce
 	if _, err := h.WithdrawRequest(replay, common.HexToHash("0x2")); err == nil {
 		t.Fatal("expected the replayed nonce to be rejected")
 	}
@@ -119,15 +107,12 @@ func TestHandler_WithdrawRequest_ReplayedNonceRejected(t *testing.T) {
 func TestHandler_WithdrawRequest_WrongSignerRejected(t *testing.T) {
 	owner := newTestKey(t)
 	impostor := newTestKey(t)
-	contract := common.HexToAddress("0xC0FFEE")
-	token := common.HexToAddress("0xBBBB")
-	to := common.HexToAddress("0xCCCC")
 
 	h, _ := newHandlerWithSigner(func(message []byte) ([]byte, error) { return []byte{1}, nil })
-	h.instructionSender = contract
+	h.instructionSender = testContract
 
 	// Sign as the impostor but claim to be the owner's address.
-	req := signWithdrawRequest(t, impostor, contract, token, to, 100, 1)
+	req := signWithdrawRequest(t, impostor, testContract, testToken, testTo, 100, 1)
 	req.User = crypto.PubkeyToAddress(owner.key.PublicKey)
 
 	if _, err := h.WithdrawRequest(req, common.HexToHash("0x1")); err == nil {
