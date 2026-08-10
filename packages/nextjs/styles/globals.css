@@ -1,6 +1,7 @@
 @import "tailwindcss";
 @import "./fonts.css";
 @import "./landing.css";
+@import "./wallet-modal.css";
 
 @custom-variant dark (&:where([data-theme=dark], [data-theme=dark] *));
 

@@ -15,6 +15,7 @@ import { getAddress } from "viem";
 import { Address } from "viem";
 import { useAccount, useDisconnect } from "wagmi";
 import { BlockieAvatar } from "~~/components/scaffold-eth";
+import { WalletModal } from "~~/components/scaffold-eth/WalletModal";
 import { useCopyToClipboard, useOutsideClick } from "~~/hooks/scaffold-eth";
 import { getTargetNetworks } from "~~/utils/scaffold-eth";
 import { isENS } from "~~/utils/scaffold-eth/common";
@@ -43,6 +44,7 @@ export const AddressInfoDropdown = ({
   const { copyToClipboard: copyAddressToClipboard, isCopiedToClipboard: isAddressCopiedToClipboard } =
     useCopyToClipboard();
   const [selectingNetwork, setSelectingNetwork] = useState(false);
+  const [walletModalOpen, setWalletModalOpen] = useState(false);
   const dropdownRef = useRef<HTMLDetailsElement>(null);
 
   const closeDropdown = () => {
@@ -67,7 +69,14 @@ export const AddressInfoDropdown = ({
         <ul className="dropdown-content menu z-10 p-2 mt-2 rounded-box border border-base-300 bg-base-100 shadow-lg shadow-black/10 dark:shadow-black/40 gap-1 min-w-56">
           <NetworkOptions hidden={!selectingNetwork} />
           <li className={selectingNetwork ? "hidden" : ""}>
-            <button className="h-8 btn-sm flex gap-3 py-3" type="button">
+            <button
+              className="h-8 btn-sm flex gap-3 py-3"
+              type="button"
+              onClick={() => {
+                closeDropdown();
+                setWalletModalOpen(true);
+              }}
+            >
               <PiWalletBold size={18} />
               <span className="whitespace-nowrap">Wallet</span>
             </button>
@@ -141,6 +150,7 @@ export const AddressInfoDropdown = ({
           </li>
         </ul>
       </details>
+      <WalletModal open={walletModalOpen} onClose={() => setWalletModalOpen(false)} />
     </>
   );
 };
