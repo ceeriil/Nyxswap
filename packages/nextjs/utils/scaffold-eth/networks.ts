@@ -46,6 +46,9 @@ export const NETWORKS_EXTRA_DATA: Record<string, ChainAttributes> = {
   [chains.hardhat.id]: {
     color: "#b8af0c",
   },
+  [chains.flareTestnet.id]: {
+    color: "#e62058",
+  },
   [chains.mainnet.id]: {
     color: "#ff8b9e",
   },

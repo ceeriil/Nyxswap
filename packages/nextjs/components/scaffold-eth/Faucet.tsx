@@ -1,82 +1,48 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Address, AddressInput, Balance, EtherInput } from "@scaffold-ui/components";
-import { Address as AddressType, createWalletClient, http, parseEther } from "viem";
-import { hardhat } from "viem/chains";
+import { useState } from "react";
+import { AddressInput } from "@scaffold-ui/components";
+import { Address as AddressType, formatUnits, parseUnits } from "viem";
+import { flareTestnet } from "viem/chains";
 import { useAccount } from "wagmi";
 import { BanknotesIcon } from "@heroicons/react/24/outline";
-import { useTargetNetwork, useTransactor } from "~~/hooks/scaffold-eth";
-import { notification } from "~~/utils/scaffold-eth";
+import { Button } from "~~/components/landing/Button";
+import { useScaffoldReadContract, useScaffoldWriteContract } from "~~/hooks/scaffold-eth";
 
-// Account index to use from generated hardhat accounts.
-const FAUCET_ACCOUNT_INDEX = 0;
-
-const localWalletClient = createWalletClient({
-  chain: hardhat,
-  transport: http(),
-});
+const FLR_DECIMALS = 18;
 
 /**
- * Faucet modal which lets you send ETH to any address.
+ * Faucet modal which mints FLR test tokens to any address on Coston2.
  */
 export const Faucet = () => {
-  const [loading, setLoading] = useState(false);
   const [inputAddress, setInputAddress] = useState<AddressType>();
-  const [faucetAddress, setFaucetAddress] = useState<AddressType>();
   const [sendValue, setSendValue] = useState("");
-  const { targetNetwork } = useTargetNetwork();
+  const { address, chain: ConnectedChain } = useAccount();
 
-  const { chain: ConnectedChain } = useAccount();
+  const { data: balance } = useScaffoldReadContract({
+    contractName: "FlrTestToken",
+    functionName: "balanceOf",
+    args: [address],
+  });
 
-  const faucetTxn = useTransactor(localWalletClient);
+  const { writeContractAsync, isMining } = useScaffoldWriteContract({ contractName: "FlrTestToken" });
 
-  useEffect(() => {
-    const getFaucetAddress = async () => {
-      try {
-        const accounts = await localWalletClient.getAddresses();
-        setFaucetAddress(accounts[FAUCET_ACCOUNT_INDEX]);
-      } catch (error) {
-        notification.error(
-          <>
-            <p className="font-bold mt-0 mb-1">Cannot connect to local provider</p>
-            <p className="m-0">
-              - Did you forget to run <code className="italic bg-base-300 text-base font-bold">yarn chain</code> ?
-            </p>
-            <p className="mt-1 break-normal">
-              - Or you can change <code className="italic bg-base-300 text-base font-bold">targetNetwork</code> in{" "}
-              <code className="italic bg-base-300 text-base font-bold">scaffold.config.ts</code>
-            </p>
-          </>,
-        );
-        console.error("⚡️ ~ file: Faucet.tsx:getFaucetAddress ~ error", error);
-      }
-    };
-    getFaucetAddress();
-  }, []);
-
-  const sendETH = async () => {
-    if (!faucetAddress || !inputAddress) {
-      return;
-    }
+  const mintFlr = async () => {
+    if (!inputAddress || !sendValue) return;
     try {
-      setLoading(true);
-      await faucetTxn({
-        to: inputAddress,
-        value: parseEther(sendValue as `${number}`),
-        account: faucetAddress,
+      await writeContractAsync({
+        functionName: "mint",
+        args: [inputAddress, parseUnits(sendValue as `${number}`, FLR_DECIMALS)],
       });
-      setLoading(false);
       setInputAddress(undefined);
       setSendValue("");
     } catch (error) {
-      console.error("⚡️ ~ file: Faucet.tsx:sendETH ~ error", error);
-      setLoading(false);
+      console.error("⚡️ ~ file: Faucet.tsx:mintFlr ~ error", error);
     }
   };
 
-  // Render only on local chain
-  if (ConnectedChain?.id !== hardhat.id) {
+  // Render only on Coston2
+  if (ConnectedChain?.id !== flareTestnet.id) {
     return null;
   }
 
@@ -91,19 +57,15 @@ export const Faucet = () => {
         <label className="modal-box relative">
           {/* dummy input to capture event onclick on modal box */}
           <input className="h-0 w-0 absolute top-0 left-0" />
-          <h3 className="text-xl font-bold mb-3">Local Faucet</h3>
+          <h3 className="text-xl font-bold mb-3">FLR Test Token Faucet</h3>
           <label htmlFor="faucet-modal" className="btn btn-ghost btn-sm absolute right-3 top-3">
             ✕
           </label>
           <div className="space-y-3">
             <div className="flex space-x-4">
               <div>
-                <span className="text-sm font-bold">From:</span>
-                <Address address={faucetAddress} onlyEnsOrAddress chain={targetNetwork} />
-              </div>
-              <div>
-                <span className="text-sm font-bold pl-3">Available:</span>
-                <Balance address={faucetAddress} />
+                <span className="text-sm font-bold">Your FLR balance:</span>{" "}
+                <span>{balance !== undefined ? formatUnits(balance, FLR_DECIMALS) : "—"}</span>
               </div>
             </div>
             <div className="flex flex-col space-y-3">
@@ -112,19 +74,24 @@ export const Faucet = () => {
                 value={inputAddress ?? ""}
                 onChange={value => setInputAddress(value as AddressType)}
               />
-              <EtherInput
-                placeholder="Amount to send"
-                onValueChange={({ valueInEth }) => setSendValue(valueInEth)}
-                style={{ width: "100%" }}
+              <input
+                type="number"
+                min="0"
+                placeholder="Amount of FLR to mint"
+                className="input input-bordered w-full"
+                value={sendValue}
+                onChange={e => setSendValue(e.target.value)}
               />
-              <button className="h-10 btn btn-primary btn-sm px-2" onClick={sendETH} disabled={loading}>
-                {!loading ? (
-                  <BanknotesIcon className="h-6 w-6" />
-                ) : (
-                  <span className="loading loading-spinner loading-sm"></span>
-                )}
-                <span>Send</span>
-              </button>
+              <Button
+                as="button"
+                onClick={mintFlr}
+                disabled={isMining || !inputAddress || !sendValue}
+                silver
+                className="w-full justify-center font-medium"
+              >
+                {isMining && <span className="loading loading-spinner loading-xs" />}
+                <span>Mint</span>
+              </Button>
             </div>
           </div>
         </label>

@@ -1,56 +1,47 @@
 "use client";
 
-import { useState } from "react";
-import { useWatchBalance } from "@scaffold-ui/hooks";
-import { createWalletClient, http, parseEther } from "viem";
-import { hardhat } from "viem/chains";
+import { parseUnits } from "viem";
+import { flareTestnet } from "viem/chains";
 import { useAccount } from "wagmi";
 import { BanknotesIcon } from "@heroicons/react/24/outline";
-import { useTransactor } from "~~/hooks/scaffold-eth";
+import { useScaffoldReadContract, useScaffoldWriteContract } from "~~/hooks/scaffold-eth";
 
-// Number of ETH faucet sends to an address
-const NUM_OF_ETH = "1";
-const FAUCET_ADDRESS = "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266";
-
-const localWalletClient = createWalletClient({
-  chain: hardhat,
-  transport: http(),
-});
+// Amount of FLR test token minted per faucet click
+const FAUCET_AMOUNT = "10000";
+const FLR_DECIMALS = 18;
 
 /**
- * FaucetButton button which lets you grab eth.
+ * FaucetButton which mints FLR test tokens to the connected wallet on Coston2.
  */
 export const FaucetButton = () => {
   const { address, chain: ConnectedChain } = useAccount();
 
-  const { data: balance } = useWatchBalance({ address, chain: hardhat });
+  const { data: balance } = useScaffoldReadContract({
+    contractName: "FlrTestToken",
+    functionName: "balanceOf",
+    args: [address],
+  });
 
-  const [loading, setLoading] = useState(false);
+  const { writeContractAsync, isMining } = useScaffoldWriteContract({ contractName: "FlrTestToken" });
 
-  const faucetTxn = useTransactor(localWalletClient);
-
-  const sendETH = async () => {
+  const mintFlr = async () => {
     if (!address) return;
     try {
-      setLoading(true);
-      await faucetTxn({
-        account: FAUCET_ADDRESS,
-        to: address,
-        value: parseEther(NUM_OF_ETH),
+      await writeContractAsync({
+        functionName: "mint",
+        args: [address, parseUnits(FAUCET_AMOUNT, FLR_DECIMALS)],
       });
-      setLoading(false);
     } catch (error) {
-      console.error("⚡️ ~ file: FaucetButton.tsx:sendETH ~ error", error);
-      setLoading(false);
+      console.error("⚡️ ~ file: FaucetButton.tsx:mintFlr ~ error", error);
     }
   };
 
-  // Render only on local chain
-  if (ConnectedChain?.id !== hardhat.id) {
+  // Render only on Coston2
+  if (ConnectedChain?.id !== flareTestnet.id) {
     return null;
   }
 
-  const isBalanceZero = balance && balance.value === 0n;
+  const isBalanceZero = balance === 0n;
 
   return (
     <div
@@ -61,8 +52,8 @@ export const FaucetButton = () => {
       }
       data-tip="Grab funds from faucet"
     >
-      <button className="btn btn-secondary btn-sm px-2" onClick={sendETH} disabled={loading}>
-        {!loading ? (
+      <button className="btn btn-secondary btn-sm px-2" onClick={mintFlr} disabled={isMining}>
+        {!isMining ? (
           <BanknotesIcon className="h-4 w-4" />
         ) : (
           <span className="loading loading-spinner loading-xs"></span>

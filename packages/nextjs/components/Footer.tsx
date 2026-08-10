@@ -2,7 +2,7 @@
 
 import React from "react";
 import { useFetchNativeCurrencyPrice } from "@scaffold-ui/hooks";
-import { hardhat } from "viem/chains";
+import { flareTestnet, hardhat } from "viem/chains";
 import { CurrencyDollarIcon, MagnifyingGlassIcon } from "@heroicons/react/24/outline";
 import { HeartIcon } from "@heroicons/react/24/outline";
 import { SwitchTheme } from "~~/components/SwitchTheme";
@@ -17,6 +17,7 @@ import { useTargetNetwork } from "~~/hooks/scaffold-eth/useTargetNetwork";
 export const Footer = () => {
   const { targetNetwork } = useTargetNetwork();
   const isLocalNetwork = targetNetwork.id === hardhat.id;
+  const isFaucetNetwork = targetNetwork.id === flareTestnet.id;
   const { price: nativeCurrencyPrice } = useFetchNativeCurrencyPrice();
 
   return (
@@ -36,19 +37,17 @@ export const Footer = () => {
                 </Button>
               </div>
             )}
+            {isFaucetNetwork && <Faucet />}
             {isLocalNetwork && (
-              <>
-                <Faucet />
-                <Button
-                  as="link"
-                  glint
-                  href="/blockexplorer"
-                  className="rounded-full px-2.5 py-1 sm:px-2.5 sm:py-1 text-xs font-normal gap-1"
-                >
-                  <MagnifyingGlassIcon className="h-3.5 w-3.5" />
-                  <span>Block Explorer</span>
-                </Button>
-              </>
+              <Button
+                as="link"
+                glint
+                href="/blockexplorer"
+                className="rounded-full px-2.5 py-1 sm:px-2.5 sm:py-1 text-xs font-normal gap-1"
+              >
+                <MagnifyingGlassIcon className="h-3.5 w-3.5" />
+                <span>Block Explorer</span>
+              </Button>
             )}
           </div>
           {/*           <SwitchTheme className={`pointer-events-auto ${isLocalNetwork ? "self-end md:self-auto" : ""}`} />

@@ -29,6 +29,7 @@ scrollSepolia = "https://sepolia-rpc.scroll.io"
 scroll = "https://rpc.scroll.io"
 pgn = "https://rpc.publicgoods.network"
 pgnTestnet = "https://sepolia.publicgoods.network"
+coston2 = "https://coston2-api.flare.network/ext/C/rpc"
 
 
 localhost = "http://127.0.0.1:8545"
@@ -36,6 +37,7 @@ localhost = "http://127.0.0.1:8545"
 [etherscan]
 polygonMumbai = { key = "${ETHERSCAN_API_KEY}" }
 sepolia = { key = "${ETHERSCAN_API_KEY}" }
+coston2 = { key = "verifyContract", url = "https://coston2-explorer.flare.network/api" }
 
 
 

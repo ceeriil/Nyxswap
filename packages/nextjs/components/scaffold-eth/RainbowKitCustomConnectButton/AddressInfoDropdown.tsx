@@ -9,6 +9,7 @@ import {
   PiEyeBold,
   PiQrCodeBold,
   PiSignOutBold,
+  PiWalletBold,
 } from "react-icons/pi";
 import { getAddress } from "viem";
 import { Address } from "viem";
@@ -65,6 +66,12 @@ export const AddressInfoDropdown = ({
         </summary>
         <ul className="dropdown-content menu z-10 p-2 mt-2 rounded-box border border-base-300 bg-base-100 shadow-lg shadow-black/10 dark:shadow-black/40 gap-1 min-w-56">
           <NetworkOptions hidden={!selectingNetwork} />
+          <li className={selectingNetwork ? "hidden" : ""}>
+            <button className="h-8 btn-sm flex gap-3 py-3" type="button">
+              <PiWalletBold size={18} />
+              <span className="whitespace-nowrap">Wallet</span>
+            </button>
+          </li>
           <li className={selectingNetwork ? "hidden" : ""}>
             <div
               className="h-8 btn-sm flex gap-3 py-3 cursor-pointer"
