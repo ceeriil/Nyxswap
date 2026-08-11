@@ -1,7 +1,6 @@
 "use client";
 
 import React from "react";
-import { useFetchNativeCurrencyPrice } from "@scaffold-ui/hooks";
 import { flareTestnet, hardhat } from "viem/chains";
 import { CurrencyDollarIcon, MagnifyingGlassIcon } from "@heroicons/react/24/outline";
 import { HeartIcon } from "@heroicons/react/24/outline";
@@ -10,6 +9,7 @@ import { BuidlGuidlLogo } from "~~/components/assets/BuidlGuidlLogo";
 import { Button } from "~~/components/landing/Button";
 import { Faucet } from "~~/components/scaffold-eth";
 import { useTargetNetwork } from "~~/hooks/scaffold-eth/useTargetNetwork";
+import { useFlrPrice } from "~~/hooks/useFlrPrice";
 
 /**
  * Site footer
@@ -18,7 +18,7 @@ export const Footer = () => {
   const { targetNetwork } = useTargetNetwork();
   const isLocalNetwork = targetNetwork.id === hardhat.id;
   const isFaucetNetwork = targetNetwork.id === flareTestnet.id;
-  const { price: nativeCurrencyPrice } = useFetchNativeCurrencyPrice();
+  const { price: nativeCurrencyPrice } = useFlrPrice();
 
   return (
     <div className="min-h-0 py-5 px-1 mb-11 lg:mb-0">
@@ -33,7 +33,7 @@ export const Footer = () => {
                   className="rounded-full px-2.5 py-1 sm:px-2.5 sm:py-1 text-xs font-normal gap-1 cursor-auto"
                 >
                   <CurrencyDollarIcon className="h-3.5 w-3.5" />
-                  <span>{nativeCurrencyPrice.toFixed(2)}</span>
+                  <span>{nativeCurrencyPrice.toFixed(4)}</span>
                 </Button>
               </div>
             )}

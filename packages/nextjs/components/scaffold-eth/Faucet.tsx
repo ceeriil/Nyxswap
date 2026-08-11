@@ -7,7 +7,9 @@ import { flareTestnet } from "viem/chains";
 import { useAccount } from "wagmi";
 import { BanknotesIcon } from "@heroicons/react/24/outline";
 import { Button } from "~~/components/landing/Button";
+import { BUTTON_STYLES } from "~~/constants/landing";
 import { useScaffoldReadContract, useScaffoldWriteContract } from "~~/hooks/scaffold-eth";
+import { cn } from "~~/utils/cn";
 
 const FLR_DECIMALS = 18;
 
@@ -48,8 +50,11 @@ export const Faucet = () => {
 
   return (
     <div>
-      <label htmlFor="faucet-modal" className="btn btn-primary btn-sm font-normal gap-1">
-        <BanknotesIcon className="h-4 w-4" />
+      <label
+        htmlFor="faucet-modal"
+        className={cn(BUTTON_STYLES.base, "rounded-full px-2.5 py-1 sm:px-2.5 sm:py-1 text-xs font-normal gap-1")}
+      >
+        <BanknotesIcon className="h-3.5 w-3.5" />
         <span>Faucet</span>
       </label>
       <input type="checkbox" id="faucet-modal" className="modal-toggle" />

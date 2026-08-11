@@ -28,6 +28,13 @@
  * script existed) and isn't touched here — its address is carried forward
  * from the existing deployedContracts.ts so this script stays safe to re-run.
  *
+ * IMPORTANT: generateTsAbis.js (run by `yarn deploy`, e.g. for
+ * DeployFlrPriceReader.s.sol) fully REGENERATES deployedContracts.ts from its
+ * own broadcast scan and has no idea about the entries this script writes —
+ * running it clobbers FlrTestToken/UsdtTestToken/BtcTestToken/EthTestToken
+ * (and collapses MintableTestToken's 3 deployments into one, under the
+ * literal class name). Re-run this script afterward to restore them.
+ *
  * Usage:
  *   node scripts-js/deployTestTokens.js --network coston2 --keystore coston2-deployer [--password-file <path>]
  */
@@ -120,11 +127,14 @@ async function main() {
     );
     process.exit(1);
   }
+  const blockByAddress = Object.fromEntries(
+    broadcast.receipts.map(r => [r.contractAddress, parseInt(r.blockNumber, 16)]),
+  );
 
   const entries = readExistingEntries(chainId);
   TOKENS_TO_DEPLOY.forEach((token, i) => {
     const address = createTxs[i].contractAddress;
-    entries[token.key] = { address, abi };
+    entries[token.key] = { address, abi, deployedOnBlock: blockByAddress[address] };
     console.log(`  ${token.key} -> ${address}`);
   });
 

@@ -1691,6 +1691,17 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@flarenetwork/flare-periphery-contracts@npm:^0.1.52":
+  version: 0.1.52
+  resolution: "@flarenetwork/flare-periphery-contracts@npm:0.1.52"
+  dependencies:
+    "@layerzerolabs/lz-evm-protocol-v2": "npm:^3.0.0"
+    "@openzeppelin/contracts": "npm:^4.6.0"
+    "@openzeppelin/contracts-upgradeable": "npm:^4.6.0"
+  checksum: 10/714c257a6b26ed24a5b266cb72b8d1d0af7061a92a56236eb11bf788c50d669ec482a981c23e6dc5b8fcf67f35570b32434c91fddba9ac0df12e1fd368a756c4
+  languageName: node
+  linkType: hard
+
 "@floating-ui/core@npm:^1.8.0":
   version: 1.8.0
   resolution: "@floating-ui/core@npm:1.8.0"
@@ -2348,6 +2359,18 @@ __metadata:
     "@jridgewell/resolve-uri": "npm:^3.1.0"
     "@jridgewell/sourcemap-codec": "npm:^1.4.14"
   checksum: 10/da0283270e691bdb5543806077548532791608e52386cfbbf3b9e8fb00457859d1bd01d512851161c886eb3a2f3ce6fd9bcf25db8edf3bddedd275bd4a88d606
+  languageName: node
+  linkType: hard
+
+"@layerzerolabs/lz-evm-protocol-v2@npm:^3.0.0":
+  version: 3.0.168
+  resolution: "@layerzerolabs/lz-evm-protocol-v2@npm:3.0.168"
+  peerDependencies:
+    "@openzeppelin/contracts": ^4.8.1 || ^5.0.0
+    "@openzeppelin/contracts-upgradeable": ^4.8.1 || ^5.0.0
+    hardhat-deploy: ^0.12.4
+    solidity-bytes-utils: ^0.8.0
+  checksum: 10/e2bfa2337d79cba248088f58f324535f937e598b2685a9caabdaad61761ab47e68812a762d9f63a8671fcf5ec342f1e6b80a0c55eebcfa52c42b8cd53d8f45a1
   languageName: node
   linkType: hard
 
@@ -3415,6 +3438,20 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@openzeppelin/contracts-upgradeable@npm:^4.6.0":
+  version: 4.9.6
+  resolution: "@openzeppelin/contracts-upgradeable@npm:4.9.6"
+  checksum: 10/af9057147f13b6f0e13ca69581777f615f2cce8c6c274ec00fbea906a9095cd9ca1fb70e2c1282122a9f522fd639641c180bf1ad79bb2722494aac5ae9e565bc
+  languageName: node
+  linkType: hard
+
+"@openzeppelin/contracts@npm:^4.6.0":
+  version: 4.9.6
+  resolution: "@openzeppelin/contracts@npm:4.9.6"
+  checksum: 10/71f45ad42e68c0559be4ba502115462a01c76fc805c08d3005c10b5550a093f1a2b00b2d7e9d6d1f331e147c50fd4ad832f71c4470ec5b34f5a2d0751cd19a47
+  languageName: node
+  linkType: hard
+
 "@oxc-project/types@npm:=0.110.0":
   version: 0.110.0
   resolution: "@oxc-project/types@npm:0.110.0"
@@ -4205,6 +4242,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@se-2/foundry@workspace:packages/foundry"
   dependencies:
+    "@flarenetwork/flare-periphery-contracts": "npm:^0.1.52"
     dotenv: "npm:~16.3.1"
     envfile: "npm:~6.18.0"
     ethers: "npm:~5.7.1"

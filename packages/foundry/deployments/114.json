@@ -1,6 +1,4 @@
 {
-  "0x08cE174E493f9E62c82BbCB707991658c8f2AA39": "EthTestToken",
-  "0x8aefDDdC40CF83fC82A7dEB4bd3F1894e76c43cd": "BtcTestToken",
-  "0xC5b806B354DBe263b2D567Ea162D3802F25E764e": "UsdtTestToken",
+  "0x106795ecF50ac3dc0165140E05C0e40A44f4B1b4": "FlrPriceReader",
   "networkName": "flare-coston2"
 }

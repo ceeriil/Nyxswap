@@ -6,6 +6,30 @@ import { GenericContractsDeclaration } from "~~/utils/scaffold-eth/contract";
 
 const deployedContracts = {
   114: {
+    FlrPriceReader: {
+      address: "0x106795ecf50ac3dc0165140e05c0e40a44f4b1b4",
+      abi: [
+        {
+          type: "function",
+          name: "FLR_USD_FEED_ID",
+          inputs: [],
+          outputs: [{ name: "", type: "bytes21", internalType: "bytes21" }],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "getFlrUsdPrice",
+          inputs: [],
+          outputs: [
+            { name: "value", type: "uint256", internalType: "uint256" },
+            { name: "decimals", type: "int8", internalType: "int8" },
+            { name: "timestamp", type: "uint64", internalType: "uint64" },
+          ],
+          stateMutability: "view",
+        },
+      ],
+      deployedOnBlock: 33898221,
+    },
     FlrTestToken: {
       address: "0x591b11abe90e8d832f04aa9e84fcee6d3c394699",
       abi: [
@@ -125,7 +149,6 @@ const deployedContracts = {
           anonymous: false,
         },
       ],
-      inheritedFunctions: {},
       deployedOnBlock: 33890963,
     },
     UsdtTestToken: {
@@ -247,6 +270,7 @@ const deployedContracts = {
           anonymous: false,
         },
       ],
+      deployedOnBlock: 33896532,
     },
     BtcTestToken: {
       address: "0x8aefdddc40cf83fc82a7deb4bd3f1894e76c43cd",
@@ -367,6 +391,7 @@ const deployedContracts = {
           anonymous: false,
         },
       ],
+      deployedOnBlock: 33896532,
     },
     EthTestToken: {
       address: "0x08ce174e493f9e62c82bbcb707991658c8f2aa39",
@@ -487,6 +512,7 @@ const deployedContracts = {
           anonymous: false,
         },
       ],
+      deployedOnBlock: 33896532,
     },
   },
 } as const;
