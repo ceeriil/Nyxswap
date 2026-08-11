@@ -95,8 +95,17 @@ func LoadTradingPairs(path string) ([]TradingPairConfig, error) {
 }
 
 // TradingPairs is the list of configured trading pairs, loaded at init from
-// PAIRS_CONFIG (default config/pairs.json — see that file for NyxSwap's
-// three pairs; addresses there are placeholders until real deployments exist).
+// PAIRS_CONFIG (default config/pairs.json). Coston2 addresses: FXRP and
+// WC2FLR (wrapped native — deposits use transferFrom, so the native token
+// itself can't be a pair leg) are real, verified on-chain against the
+// FlareContractRegistry (0xaD67FE66660Fb8dFE9d6b1b4240d8650e30F6019) and
+// AssetManagerFXRP.fAsset(). getAssetManagers() on Coston2's
+// AssetManagerController confirms FXRP is the only live FAsset right now —
+// no FDOGE/FLTC/etc. yet. There's no canonical stablecoin on Coston2 (no
+// registry entry, and the explorer shows dozens of unverifiable
+// same-named "USDT0" tokens), so the USDT-quoted pairs use this repo's own
+// already-deployed UsdtTestToken (packages/foundry/contracts/mocks/MintableTestToken.sol,
+// deployed via script/DeployTestTokens.s.sol) — mock, not real, on purpose.
 var TradingPairs []TradingPairConfig
 
 // Environment variables override defaults.
