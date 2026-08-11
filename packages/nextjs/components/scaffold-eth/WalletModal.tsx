@@ -2,10 +2,12 @@
 
 import { useEffect, useState } from "react";
 import { formatUnits, parseUnits } from "viem";
+import { flareTestnet } from "viem/chains";
 import { useAccount } from "wagmi";
 import { useScaffoldReadContract, useScaffoldWriteContract } from "~~/hooks/scaffold-eth";
 import { useTargetNetwork } from "~~/hooks/scaffold-eth/useTargetNetwork";
 import { notification } from "~~/utils/scaffold-eth";
+import { contracts } from "~~/utils/scaffold-eth/contract";
 
 type TokenSymbol = "FLR" | "USDT" | "BTC" | "ETH";
 type Tab = "FAUCET" | "DEPOSIT" | "WITHDRAW" | "HISTORY";
@@ -35,6 +37,14 @@ function formatAmount(balance: bigint | undefined, decimals: number): string {
   if (balance === undefined) return "—";
   return parseFloat(formatUnits(balance, decimals)).toFixed(4);
 }
+
+// Deployment addresses are static config, not chain-fetched state — plain lookup
+// instead of a hook. Undefined until the matching Foundry deploy has run.
+function getContractAddress(contractName: string): `0x${string}` | undefined {
+  return contracts?.[flareTestnet.id]?.[contractName]?.address as `0x${string}` | undefined;
+}
+
+const INSTRUCTION_SENDER_ADDRESS = getContractAddress("NyxSwapInstructionSender");
 
 type WalletModalProps = {
   open: boolean;
@@ -79,6 +89,34 @@ export const WalletModal = ({ open, onClose }: WalletModalProps) => {
     ETH: ethBalance.data,
   };
 
+  const flrAllowance = useScaffoldReadContract({
+    contractName: "FlrTestToken",
+    functionName: "allowance",
+    args: [address, INSTRUCTION_SENDER_ADDRESS],
+  });
+  const usdtAllowance = useScaffoldReadContract({
+    contractName: "UsdtTestToken",
+    functionName: "allowance",
+    args: [address, INSTRUCTION_SENDER_ADDRESS],
+  });
+  const btcAllowance = useScaffoldReadContract({
+    contractName: "BtcTestToken",
+    functionName: "allowance",
+    args: [address, INSTRUCTION_SENDER_ADDRESS],
+  });
+  const ethAllowance = useScaffoldReadContract({
+    contractName: "EthTestToken",
+    functionName: "allowance",
+    args: [address, INSTRUCTION_SENDER_ADDRESS],
+  });
+
+  const allowances: Record<TokenSymbol, bigint | undefined> = {
+    FLR: flrAllowance.data,
+    USDT: usdtAllowance.data,
+    BTC: btcAllowance.data,
+    ETH: ethAllowance.data,
+  };
+
   const flrWrite = useScaffoldWriteContract({ contractName: "FlrTestToken" });
   const usdtWrite = useScaffoldWriteContract({ contractName: "UsdtTestToken" });
   const btcWrite = useScaffoldWriteContract({ contractName: "BtcTestToken" });
@@ -90,6 +128,10 @@ export const WalletModal = ({ open, onClose }: WalletModalProps) => {
     BTC: btcWrite,
     ETH: ethWrite,
   };
+
+  const instructionSenderWrite = useScaffoldWriteContract({ contractName: "NyxSwapInstructionSender" });
+
+  const [depositStep, setDepositStep] = useState<"idle" | "approving" | "depositing">("idle");
 
   const selectedToken = TOKENS[tokenIdx];
 
@@ -142,8 +184,41 @@ export const WalletModal = ({ open, onClose }: WalletModalProps) => {
     }
   };
 
-  const handleDeposit = () => {
-    notification.info("Deposits aren't wired up yet — coming soon");
+  const handleDeposit = async () => {
+    if (!address || !amount) return;
+    const tokenAddress = getContractAddress(selectedToken.contractName);
+    if (!INSTRUCTION_SENDER_ADDRESS || !tokenAddress) {
+      notification.error("NyxSwapInstructionSender isn't deployed yet — did you forget to run `yarn deploy`?");
+      return;
+    }
+
+    const rawAmount = parseUnits(amount, selectedToken.decimals);
+    const currentAllowance = allowances[selectedToken.symbol] ?? 0n;
+
+    try {
+      if (currentAllowance < rawAmount) {
+        setDepositStep("approving");
+        const approveTx = await writers[selectedToken.symbol].writeContractAsync({
+          functionName: "approve",
+          args: [INSTRUCTION_SENDER_ADDRESS, rawAmount],
+        });
+        if (!approveTx) return;
+      }
+
+      setDepositStep("depositing");
+      const depositTx = await instructionSenderWrite.writeContractAsync({
+        functionName: "deposit",
+        args: [tokenAddress, rawAmount],
+      });
+      if (depositTx) {
+        addHistory("DEPOSIT", selectedToken.symbol, amount);
+        setAmount("");
+      }
+    } catch (error) {
+      console.error(`⚡️ ~ file: WalletModal.tsx:handleDeposit ~ ${selectedToken.symbol} ~ error`, error);
+    } finally {
+      setDepositStep("idle");
+    }
   };
 
   const handleWithdraw = () => {
@@ -279,8 +354,16 @@ export const WalletModal = ({ open, onClose }: WalletModalProps) => {
                     {amount || "0"} {selectedToken.symbol}
                   </span>
                 </div>
-                <button className="wallet-submit" onClick={handleDeposit} disabled={!amount || !address}>
-                  {`Deposit ${selectedToken.symbol}`}
+                <button
+                  className="wallet-submit"
+                  onClick={handleDeposit}
+                  disabled={!amount || !address || depositStep !== "idle"}
+                >
+                  {depositStep === "approving"
+                    ? `Approving ${selectedToken.symbol}...`
+                    : depositStep === "depositing"
+                      ? "Depositing..."
+                      : `Deposit ${selectedToken.symbol}`}
                 </button>
               </>
             )}

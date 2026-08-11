@@ -217,4 +217,10 @@ contract NyxSwapInstructionSender {
         require(_extensionId != 0, "Extension ID is not set.");
         return _extensionId;
     }
+
+    /// @notice Returns the cached extension ID, or 0 if setExtensionId() hasn't been
+    /// called yet. Used by the frontend to show TEE registration/liveness status.
+    function extensionId() external view returns (uint256) {
+        return _extensionId;
+    }
 }

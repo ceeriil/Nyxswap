@@ -10,6 +10,8 @@ import { Button } from "~~/components/landing/Button";
 import { Faucet } from "~~/components/scaffold-eth";
 import { useTargetNetwork } from "~~/hooks/scaffold-eth/useTargetNetwork";
 import { useFlrPrice } from "~~/hooks/useFlrPrice";
+import { useTeeStatus } from "~~/hooks/useTeeStatus";
+import { cn } from "~~/utils/cn";
 
 /**
  * Site footer
@@ -19,6 +21,7 @@ export const Footer = () => {
   const isLocalNetwork = targetNetwork.id === hardhat.id;
   const isFaucetNetwork = targetNetwork.id === flareTestnet.id;
   const { price: nativeCurrencyPrice } = useFlrPrice();
+  const { online: teeOnline, isLoading: teeStatusLoading } = useTeeStatus();
 
   return (
     <div className="min-h-0 py-5 px-1 mb-11 lg:mb-0">
@@ -36,6 +39,19 @@ export const Footer = () => {
                   <span>{nativeCurrencyPrice.toFixed(4)}</span>
                 </Button>
               </div>
+            )}
+            {isFaucetNetwork && !teeStatusLoading && (
+              <Button
+                as="button"
+                glint
+                className="rounded-full px-2.5 py-1 sm:px-2.5 sm:py-1 text-xs font-normal gap-1.5 cursor-auto"
+              >
+                <span
+                  className={cn("h-1.5 w-1.5 rounded-full", teeOnline ? "bg-success" : "bg-error")}
+                  aria-hidden="true"
+                />
+                <span className="tracking-wide">TEE {teeOnline ? "ONLINE" : "OFFLINE"}</span>
+              </Button>
             )}
             {isFaucetNetwork && <Faucet />}
             {isLocalNetwork && (
