@@ -1,6 +1,5 @@
 import { SwapCard } from "./_components/SwapCard";
 import type { NextPage } from "next";
-import { BackgroundLayer } from "~~/components/landing/BackgroundLayer";
 import { getMetadata } from "~~/utils/scaffold-eth/getMetadata";
 
 export const metadata = getMetadata({
@@ -12,7 +11,6 @@ export const metadata = getMetadata({
 const Trade: NextPage = () => {
   return (
     <div className="relative flex flex-1 items-center justify-center px-4 py-16">
-      <BackgroundLayer />
       <div className="relative z-10">
         <SwapCard />
       </div>

@@ -52,7 +52,12 @@ export const FaucetButton = () => {
       }
       data-tip="Grab funds from faucet"
     >
-      <button className="btn btn-secondary btn-sm px-2" onClick={mintFlr} disabled={isMining}>
+      <button
+        className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-landing-button-border bg-landing-button-bg text-landing-fg transition-colors duration-300 hover:bg-landing-button-hover cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
+        onClick={mintFlr}
+        disabled={isMining}
+        title="Mint FLR test tokens"
+      >
         {!isMining ? (
           <BanknotesIcon className="h-4 w-4" />
         ) : (
