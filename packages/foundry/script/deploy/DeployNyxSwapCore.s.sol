@@ -2,13 +2,13 @@
 pragma solidity ^0.8.27;
 
 import "./DeployHelpers.s.sol";
-import { NyxSwapVault } from "../contracts/NyxSwapVault.sol";
-import { NyxSwapAllowListAuthentication } from "../contracts/access/NyxSwapAllowListAuthentication.sol";
-import { NyxSwapInstructionSender } from "../contracts/tee/InstructionSender.sol";
-import { ITeeExtensionRegistry } from "../contracts/tee/interfaces/ITeeExtensionRegistry.sol";
-import { ITeeMachineRegistry } from "../contracts/tee/interfaces/ITeeMachineRegistry.sol";
-import { INyxSwapVault } from "../contracts/interfaces/INyxSwapVault.sol";
-import { INyxSwapAllowList } from "../contracts/access/interfaces/INyxSwapAllowList.sol";
+import { NyxSwapVault } from "../../contracts/NyxSwapVault.sol";
+import { NyxSwapAllowListAuthentication } from "../../contracts/access/NyxSwapAllowListAuthentication.sol";
+import { NyxSwapInstructionSender } from "../../contracts/tee/InstructionSender.sol";
+import { ITeeExtensionRegistry } from "../../contracts/tee/interfaces/ITeeExtensionRegistry.sol";
+import { ITeeMachineRegistry } from "../../contracts/tee/interfaces/ITeeMachineRegistry.sol";
+import { INyxSwapVault } from "../../contracts/interfaces/INyxSwapVault.sol";
+import { INyxSwapAllowList } from "../../contracts/access/interfaces/INyxSwapAllowList.sol";
 
 /**
  * @notice Deploys NyxSwap's on-chain core (Vault, AllowList, InstructionSender) and

@@ -1,14 +1,9 @@
 #!/usr/bin/env node
 /**
- * Deploys USDT/BTC/ETH test tokens via script/DeployTestTokens.s.sol (which
- * deploys the single MintableTestToken contract three times, once per
- * symbol), then writes ../nextjs/contracts/deployedContracts.ts with one
- * named entry per deployment, all sharing MintableTestToken's ABI.
- *
- * One generic contract, deployed N times with different constructor args —
- * mirrors fce-orderbook's tools/cmd/test-setup pattern (a single TestToken.sol
- * deployed once per symbol via a Go loop). This is the same idea via a
- * Foundry script since this repo's tooling is Node/Foundry, not Go.
+ * Deploys a SeedTokenFactory and clones one SeedToken per entry in
+ * script/mocks/tokens.json via script/mocks/DeployTestTokens.s.sol, then
+ * writes ../nextjs/contracts/deployedContracts.ts with a SeedTokenFactory
+ * entry plus one named entry per token clone (all sharing SeedToken's ABI).
  *
  * `forge create` was tried first (simpler, one call per token) but throws
  * "Device not configured (os error 6)" in this sandbox — some TTY probe it
@@ -16,22 +11,25 @@
  * broadcast log instead.
  *
  * generateTsAbis.js can't be reused for this: it dedupes deployments by
- * `${chainId}-${contractName}`, so multiple instances of the same Solidity
- * contract class collapse to just the last one. Hence this separate script,
- * which keys entries by the caller-supplied token key instead — matched to
- * the broadcast's CREATE transactions *by order*, since every deployment
- * shares the literal contract name "MintableTestToken" and can't be told
- * apart by name. TOKENS_TO_DEPLOY's order must match
- * DeployTestTokens.s.sol's deployment order exactly.
+ * `${chainId}-${contractName}`, so multiple SeedToken clones (all sharing
+ * the literal contract name "SeedToken") would collapse to just the last
+ * one. Hence this separate script, which keys entries by the caller-supplied
+ * token key instead.
+ *
+ * SeedTokenFactory.deployToken() is a CALL, not a CREATE — the clone address
+ * isn't in the transaction's top-level fields the way a CREATE's is, so this
+ * reads it out of each call's TokenDeployed(address,string,string) event log
+ * instead, then cross-checks the log's symbol against tokens.json's to catch
+ * any order drift between the two.
  *
  * IMPORTANT: generateTsAbis.js (run by `yarn deploy`, e.g. for any other
  * single-instance contract) fully REGENERATES deployedContracts.ts from its
  * own broadcast scan and has no idea about the entries this script writes —
- * running it clobbers FlrTestToken/UsdtTestToken/BtcTestToken/EthTestToken
- * (and collapses MintableTestToken's 3 deployments into one, under the
- * literal class name). Run this script with --restore-only afterward to put
- * them back, at no gas cost — it doesn't deploy anything in that mode, just
- * re-merges the known addresses (below) into whatever's currently on disk.
+ * running it clobbers every key in KNOWN_TOKEN_ADDRESSES below (and collapses
+ * every SeedToken clone into one, under the literal class name). Run this
+ * script with --restore-only afterward to put them back, at no gas cost — it
+ * doesn't deploy anything in that mode, just re-merges the known addresses
+ * (below) into whatever's currently on disk.
  *
  * Usage:
  *   node scripts-js/deployTestTokens.js --network coston2 --keystore coston2-deployer [--password-file <path>]
@@ -42,19 +40,24 @@ import { existsSync, readFileSync, writeFileSync } from "fs";
 import { dirname, join } from "path";
 import { fileURLToPath } from "url";
 import { format } from "prettier";
+import { utils } from "ethers";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const foundryRoot = join(__dirname, "..");
-const deployedContractsPath = join(foundryRoot, "../nextjs/contracts/deployedContracts.ts");
+const deployedContractsPath = join(
+  foundryRoot,
+  "../nextjs/contracts/deployedContracts.ts"
+);
 
 const CHAIN_IDS = { coston2: 114 };
 
-// Order must match script/DeployTestTokens.s.sol's deployment order.
-const TOKENS_TO_DEPLOY = [
-  { key: "UsdtTestToken", name: "Tether USD (Test)", symbol: "USDT", decimals: 6 },
-  { key: "BtcTestToken", name: "Bitcoin (Test)", symbol: "BTC", decimals: 8 },
-  { key: "EthTestToken", name: "Ether (Test)", symbol: "ETH", decimals: 18 },
-];
+// Same file DeployTestTokens.s.sol reads — order here is authoritative for
+// both, since deployToken() calls come back in this array's order.
+const TOKENS_TO_DEPLOY = JSON.parse(
+  readFileSync(join(foundryRoot, "script/mocks/tokens.json"), "utf-8")
+);
+
+const TOKEN_DEPLOYED_TOPIC = utils.id("TokenDeployed(address,string,string)");
 
 // Known-good addresses already live on Coston2 — used by --restore-only, and as a
 // fallback in normal mode if one's missing from the current deployedContracts.ts
@@ -63,9 +66,6 @@ const TOKENS_TO_DEPLOY = [
 // existed — it's not one of TOKENS_TO_DEPLOY, but still needs restoring the same way.
 const KNOWN_TOKEN_ADDRESSES = {
   FlrTestToken: "0x591B11abe90E8D832F04aa9E84fcEe6D3c394699",
-  UsdtTestToken: "0xC5b806B354DBe263b2D567Ea162D3802F25E764e",
-  BtcTestToken: "0x8aefDDdC40CF83fC82A7dEB4bd3F1894e76c43cd",
-  EthTestToken: "0x08cE174E493f9E62c82BbCB707991658c8f2AA39",
 };
 
 function getArg(name, fallback) {
@@ -90,6 +90,7 @@ function readExistingEntries(chainId) {
   // Dead orphans from earlier mis-named / collapsed-by-generateTsAbis deploys.
   delete chainEntries.TestToken;
   delete chainEntries.MintableTestToken;
+  delete chainEntries.SeedToken;
   return chainEntries;
 }
 
@@ -105,30 +106,45 @@ async function writeEntries(chainId, entries) {
 
     export default deployedContracts satisfies GenericContractsDeclaration;
   `;
-  writeFileSync(deployedContractsPath, await format(fileContent, { parser: "typescript", printWidth: 120 }));
+  writeFileSync(
+    deployedContractsPath,
+    await format(fileContent, { parser: "typescript", printWidth: 120 })
+  );
   console.log(`Wrote ${deployedContractsPath}`);
+}
+
+function loadAbi(contractName) {
+  const artifactPath = join(
+    foundryRoot,
+    `out/${contractName}.sol/${contractName}.json`
+  );
+  if (!existsSync(artifactPath)) {
+    console.error(
+      `Missing build artifact at ${artifactPath} — run \`forge build\` first`
+    );
+    process.exit(1);
+  }
+  return JSON.parse(readFileSync(artifactPath, "utf-8")).abi;
 }
 
 async function main() {
   const network = getArg("network", "coston2");
   const chainId = CHAIN_IDS[network];
   if (!chainId) {
-    console.error(`Unknown network "${network}" — add it to CHAIN_IDS in this script`);
+    console.error(
+      `Unknown network "${network}" — add it to CHAIN_IDS in this script`
+    );
     process.exit(1);
   }
 
-  const artifactPath = join(foundryRoot, "out/MintableTestToken.sol/MintableTestToken.json");
-  if (!existsSync(artifactPath)) {
-    console.error(`Missing build artifact at ${artifactPath} — run \`forge build\` first`);
-    process.exit(1);
-  }
-  const abi = JSON.parse(readFileSync(artifactPath, "utf-8")).abi;
+  const factoryAbi = loadAbi("SeedTokenFactory");
+  const tokenAbi = loadAbi("SeedToken");
 
   const entries = readExistingEntries(chainId);
 
   if (hasFlag("restore-only")) {
     for (const [key, address] of Object.entries(KNOWN_TOKEN_ADDRESSES)) {
-      entries[key] = { address, abi };
+      entries[key] = { address, abi: tokenAbi };
       console.log(`  ${key} -> ${address}`);
     }
     await writeEntries(chainId, entries);
@@ -138,15 +154,21 @@ async function main() {
   const keystore = getArg("keystore");
   const passwordFile = getArg("password-file");
   if (!keystore) {
-    console.error("Usage: node deployTestTokens.js --network <net> --keystore <name> [--password-file <path>]");
+    console.error(
+      "Usage: node deployTestTokens.js --network <net> --keystore <name> [--password-file <path>]"
+    );
     console.error("   or: node deployTestTokens.js --restore-only");
     process.exit(1);
   }
 
-  console.log(`Deploying ${TOKENS_TO_DEPLOY.map(t => t.symbol).join(", ")} via DeployTestTokens.s.sol...`);
+  console.log(
+    `Deploying SeedTokenFactory + ${TOKENS_TO_DEPLOY.map((t) => t.symbol).join(
+      ", "
+    )}...`
+  );
   const forgeArgs = [
     "script",
-    "script/DeployTestTokens.s.sol",
+    "script/mocks/DeployTestTokens.s.sol",
     "--rpc-url",
     network,
     "--account",
@@ -156,31 +178,83 @@ async function main() {
   ];
   if (passwordFile) forgeArgs.push("--password-file", passwordFile);
 
-  const result = spawnSync("forge", forgeArgs, { cwd: foundryRoot, encoding: "utf-8", stdio: "inherit" });
+  const result = spawnSync("forge", forgeArgs, {
+    cwd: foundryRoot,
+    encoding: "utf-8",
+    stdio: "inherit",
+  });
   if (result.status !== 0) {
     process.exit(1);
   }
 
-  const broadcastPath = join(foundryRoot, `broadcast/DeployTestTokens.s.sol/${chainId}/run-latest.json`);
+  const broadcastPath = join(
+    foundryRoot,
+    `broadcast/DeployTestTokens.s.sol/${chainId}/run-latest.json`
+  );
   const broadcast = JSON.parse(readFileSync(broadcastPath, "utf-8"));
-  const createTxs = broadcast.transactions.filter(tx => tx.transactionType === "CREATE");
-  if (createTxs.length !== TOKENS_TO_DEPLOY.length) {
+
+  const factoryTx = broadcast.transactions.find(
+    (tx) =>
+      tx.transactionType === "CREATE" && tx.contractName === "SeedTokenFactory"
+  );
+  if (!factoryTx) {
+    console.error(`No SeedTokenFactory CREATE tx found in ${broadcastPath}`);
+    process.exit(1);
+  }
+  const factoryAddress = factoryTx.contractAddress;
+
+  const deployCallTxs = broadcast.transactions.filter(
+    (tx) =>
+      tx.transactionType === "CALL" &&
+      tx.transaction.to?.toLowerCase() === factoryAddress.toLowerCase()
+  );
+  if (deployCallTxs.length !== TOKENS_TO_DEPLOY.length) {
     console.error(
-      `Expected ${TOKENS_TO_DEPLOY.length} CREATE txs in ${broadcastPath}, found ${createTxs.length}. ` +
-        `Did DeployTestTokens.s.sol change without updating TOKENS_TO_DEPLOY here?`,
+      `Expected ${TOKENS_TO_DEPLOY.length} deployToken() calls in ${broadcastPath}, found ${deployCallTxs.length}. ` +
+        `Did DeployTestTokens.s.sol change without updating tokens.json (or vice versa)?`
     );
     process.exit(1);
   }
-  const blockByAddress = Object.fromEntries(
-    broadcast.receipts.map(r => [r.contractAddress, parseInt(r.blockNumber, 16)]),
+
+  const receiptByHash = Object.fromEntries(
+    broadcast.receipts.map((r) => [r.transactionHash, r])
   );
+  const blockByAddress = Object.fromEntries(
+    broadcast.receipts.map((r) => [
+      r.contractAddress,
+      parseInt(r.blockNumber, 16),
+    ])
+  );
+  const factoryBlock = blockByAddress[factoryAddress];
 
   // FLR isn't redeployed here, but restore it if it's missing from what's on disk.
-  entries.FlrTestToken ??= { address: KNOWN_TOKEN_ADDRESSES.FlrTestToken, abi };
+  entries.FlrTestToken ??= {
+    address: KNOWN_TOKEN_ADDRESSES.FlrTestToken,
+    abi: tokenAbi,
+  };
+
+  entries.SeedTokenFactory = {
+    address: factoryAddress,
+    abi: factoryAbi,
+    deployedOnBlock: factoryBlock,
+  };
+  console.log(`  SeedTokenFactory -> ${factoryAddress}`);
 
   TOKENS_TO_DEPLOY.forEach((token, i) => {
-    const address = createTxs[i].contractAddress;
-    entries[token.key] = { address, abi, deployedOnBlock: blockByAddress[address] };
+    const receipt = receiptByHash[deployCallTxs[i].hash];
+    const log = receipt.logs.find((l) => l.topics[0] === TOKEN_DEPLOYED_TOPIC);
+    if (!log) {
+      console.error(
+        `No TokenDeployed log found for ${token.symbol} in tx ${deployCallTxs[i].hash}`
+      );
+      process.exit(1);
+    }
+    const address = utils.getAddress(`0x${log.topics[1].slice(-40)}`);
+    entries[token.key] = {
+      address,
+      abi: tokenAbi,
+      deployedOnBlock: parseInt(receipt.blockNumber, 16),
+    };
     console.log(`  ${token.key} -> ${address}`);
   });
 

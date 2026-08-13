@@ -1,6 +1,6 @@
 .PHONY: build deploy generate-abis get-address account chain compile flatten fork format lint test verify
 
-DEPLOY_SCRIPT ?= script/Deploy.s.sol
+DEPLOY_SCRIPT ?= script/deploy/Deploy.s.sol
 
 # setup wallet for anvil
 setup-anvil-wallet:

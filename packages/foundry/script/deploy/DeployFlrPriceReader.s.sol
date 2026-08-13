@@ -2,7 +2,7 @@
 pragma solidity ^0.8.19;
 
 import "./DeployHelpers.s.sol";
-import { FlrPriceReader } from "../contracts/FlrPriceReader.sol";
+import { FlrPriceReader } from "../../contracts/FlrPriceReader.sol";
 
 /**
  * @notice Deploys FlrPriceReader, which reads FLR/USD off Flare's FTSOv2 oracle.
