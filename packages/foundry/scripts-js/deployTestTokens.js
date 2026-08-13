@@ -1,9 +1,10 @@
 #!/usr/bin/env node
 /**
- * Deploys a SeedTokenFactory and clones one SeedToken per entry in
- * script/mocks/tokens.json via script/mocks/DeployTestTokens.s.sol, then
- * writes ../nextjs/contracts/deployedContracts.ts with a SeedTokenFactory
- * entry plus one named entry per token clone (all sharing SeedToken's ABI).
+ * Deploys a SeedTokenFactory, clones one SeedToken per entry in
+ * script/mocks/tokens.json, and deploys a Faucet wired up to all of them, via
+ * script/mocks/DeployTestTokens.s.sol. Writes
+ * ../nextjs/contracts/deployedContracts.ts with SeedTokenFactory and Faucet
+ * entries plus one named entry per token clone (all sharing SeedToken's ABI).
  *
  * `forge create` was tried first (simpler, one call per token) but throws
  * "Device not configured (os error 6)" in this sandbox — some TTY probe it
@@ -124,6 +125,7 @@ function loadAbi(contractName) {
     );
     process.exit(1);
   }
+  const faucetAbi = loadAbi("Faucet");
   return JSON.parse(readFileSync(artifactPath, "utf-8")).abi;
 }
 
@@ -209,6 +211,20 @@ async function main() {
       tx.transaction.to?.toLowerCase() === factoryAddress.toLowerCase()
   );
   if (deployCallTxs.length !== TOKENS_TO_DEPLOY.length) {
+    const faucetTx = broadcast.transactions.find(
+      (tx) => tx.transactionType === "CREATE" && tx.contractName === "Faucet"
+    );
+    if (!faucetTx) {
+      console.error(`No Faucet CREATE tx found in ${broadcastPath}`);
+      process.exit(1);
+    }
+    entries.Faucet = {
+      address: faucetTx.contractAddress,
+      abi: faucetAbi,
+      deployedOnBlock: blockByAddress[faucetTx.contractAddress],
+    };
+    console.log(`  Faucet -> ${faucetTx.contractAddress}`);
+
     console.error(
       `Expected ${TOKENS_TO_DEPLOY.length} deployToken() calls in ${broadcastPath}, found ${deployCallTxs.length}. ` +
         `Did DeployTestTokens.s.sol change without updating tokens.json (or vice versa)?`
