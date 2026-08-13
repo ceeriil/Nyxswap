@@ -125,7 +125,6 @@ function loadAbi(contractName) {
     );
     process.exit(1);
   }
-  const faucetAbi = loadAbi("Faucet");
   return JSON.parse(readFileSync(artifactPath, "utf-8")).abi;
 }
 
@@ -141,6 +140,7 @@ async function main() {
 
   const factoryAbi = loadAbi("SeedTokenFactory");
   const tokenAbi = loadAbi("SeedToken");
+  const faucetAbi = loadAbi("Faucet");
 
   const entries = readExistingEntries(chainId);
 
@@ -211,24 +211,18 @@ async function main() {
       tx.transaction.to?.toLowerCase() === factoryAddress.toLowerCase()
   );
   if (deployCallTxs.length !== TOKENS_TO_DEPLOY.length) {
-    const faucetTx = broadcast.transactions.find(
-      (tx) => tx.transactionType === "CREATE" && tx.contractName === "Faucet"
-    );
-    if (!faucetTx) {
-      console.error(`No Faucet CREATE tx found in ${broadcastPath}`);
-      process.exit(1);
-    }
-    entries.Faucet = {
-      address: faucetTx.contractAddress,
-      abi: faucetAbi,
-      deployedOnBlock: blockByAddress[faucetTx.contractAddress],
-    };
-    console.log(`  Faucet -> ${faucetTx.contractAddress}`);
-
     console.error(
       `Expected ${TOKENS_TO_DEPLOY.length} deployToken() calls in ${broadcastPath}, found ${deployCallTxs.length}. ` +
         `Did DeployTestTokens.s.sol change without updating tokens.json (or vice versa)?`
     );
+    process.exit(1);
+  }
+
+  const faucetTx = broadcast.transactions.find(
+    (tx) => tx.transactionType === "CREATE" && tx.contractName === "Faucet"
+  );
+  if (!faucetTx) {
+    console.error(`No Faucet CREATE tx found in ${broadcastPath}`);
     process.exit(1);
   }
 
@@ -241,7 +235,6 @@ async function main() {
       parseInt(r.blockNumber, 16),
     ])
   );
-  const factoryBlock = blockByAddress[factoryAddress];
 
   // FLR isn't redeployed here, but restore it if it's missing from what's on disk.
   entries.FlrTestToken ??= {
@@ -252,7 +245,7 @@ async function main() {
   entries.SeedTokenFactory = {
     address: factoryAddress,
     abi: factoryAbi,
-    deployedOnBlock: factoryBlock,
+    deployedOnBlock: blockByAddress[factoryAddress],
   };
   console.log(`  SeedTokenFactory -> ${factoryAddress}`);
 
@@ -273,6 +266,13 @@ async function main() {
     };
     console.log(`  ${token.key} -> ${address}`);
   });
+
+  entries.Faucet = {
+    address: faucetTx.contractAddress,
+    abi: faucetAbi,
+    deployedOnBlock: blockByAddress[faucetTx.contractAddress],
+  };
+  console.log(`  Faucet -> ${faucetTx.contractAddress}`);
 
   await writeEntries(chainId, entries);
 }
