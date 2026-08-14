@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 import { FTSO_DEVIATION_WARN_PCT, getFtsoReferencePrice, quoteSwap } from "./mockPool";
-import { TOKENS, type TokenSymbol } from "./tokens";
+import type { TokenSymbol } from "./tokens";
 
 export const SLIPPAGE_OPTIONS = ["auto", "0.1", "0.5", "1"] as const;
 export type SlippageOption = (typeof SLIPPAGE_OPTIONS)[number] | "custom";
@@ -19,7 +19,7 @@ export type SubmitPhase =
 
 export const useSwapForm = () => {
   const [sendToken, setSendToken] = useState<TokenSymbol>("FXRP");
-  const [receiveToken, setReceiveToken] = useState<TokenSymbol>("FLR");
+  const [receiveToken, setReceiveToken] = useState<TokenSymbol>("WFLR");
   const [sendAmount, setSendAmount] = useState("");
 
   const [slippageOption, setSlippageOption] = useState<SlippageOption>("auto");
@@ -50,7 +50,9 @@ export const useSwapForm = () => {
 
   const minimumReceived = quote.amountOut * (1 - slippagePct / 100);
 
-  const needsApproval = !TOKENS[sendToken].isNative && !approvedTokens.has(sendToken);
+  // Every deployed test token is a real ERC20 (no native-token case
+  // anymore), so approval is always required until granted.
+  const needsApproval = !approvedTokens.has(sendToken);
 
   const derivedPhase: SubmitPhase = useMemo(() => {
     if (phase === "approving" || phase === "confirming" || phase === "settled" || phase === "failed") return phase;

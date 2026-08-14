@@ -1,24 +1,29 @@
 "use client";
 
-import { TokenIcon } from "../../app/_components/TokenIcon";
-import { TOKENS } from "../../app/_lib/tokens";
 import type { SwapRecord } from "../_lib/mockSwapHistory";
 import { TxHashLink } from "./TxHashLink";
 import { Address } from "@scaffold-ui/components";
 import { createColumnHelper } from "@tanstack/react-table";
+import { TokenIcon } from "~~/components/assets/TokenIcon";
+import { useDeployedTestTokens } from "~~/hooks/wallet/useDeployedTestTokens";
 import { useTargetNetwork } from "~~/hooks/scaffold-eth/useTargetNetwork";
 
 const columnHelper = createColumnHelper<SwapRecord>();
 
-const PairCell = ({ tokenIn, tokenOut }: Pick<SwapRecord, "tokenIn" | "tokenOut">) => (
-  <span className="flex items-center gap-1 whitespace-nowrap">
-    <TokenIcon symbol={tokenIn} colorClassName={TOKENS[tokenIn].avatarClassName} size="sm" />
-    {tokenIn}
-    <span className="text-base-content/40">→</span>
-    <TokenIcon symbol={tokenOut} colorClassName={TOKENS[tokenOut].avatarClassName} size="sm" />
-    {tokenOut}
-  </span>
-);
+const PairCell = ({ tokenIn, tokenOut }: Pick<SwapRecord, "tokenIn" | "tokenOut">) => {
+  const { tokens } = useDeployedTestTokens();
+  const logoFor = (symbol: string) => tokens.find(t => t.symbol === symbol)?.logoURI;
+
+  return (
+    <span className="flex items-center gap-1 whitespace-nowrap">
+      <TokenIcon symbol={tokenIn} logoURI={logoFor(tokenIn)} size="sm" />
+      {tokenIn}
+      <span className="text-base-content/40">→</span>
+      <TokenIcon symbol={tokenOut} logoURI={logoFor(tokenOut)} size="sm" />
+      {tokenOut}
+    </span>
+  );
+};
 
 const TraderCell = ({ address }: { address: SwapRecord["trader"] }) => {
   const { targetNetwork } = useTargetNetwork();

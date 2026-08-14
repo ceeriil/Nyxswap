@@ -22,27 +22,32 @@ const MOCK_TRADERS: Address[] = Array.from(
   (_, i) => `0x${(i + 1).toString(16).padStart(40, "0")}` as Address,
 );
 
+// The three real trading pairs configured in
+// packages/tee-extension/config/pairs.json - mock history only spans these,
+// not all 20 deployed test tokens, since most of those exist for the
+// faucet/balance-testing surface, not as an actual matched pair.
 const PAIRS: [TokenSymbol, TokenSymbol][] = [
-  ["FXRP", "FLR"],
-  ["FLR", "FXRP"],
-  ["FXRP", "USDC"],
-  ["USDC", "FXRP"],
-  ["FLR", "USDC"],
-  ["USDC", "FLR"],
+  ["FXRP", "WFLR"],
+  ["WFLR", "FXRP"],
+  ["FXRP", "USDT"],
+  ["USDT", "FXRP"],
+  ["WFLR", "USDT"],
+  ["USDT", "WFLR"],
 ];
 
-const AMOUNT_IN_RANGE: Record<TokenSymbol, [number, number]> = {
+const AMOUNT_IN_RANGE: Record<string, [number, number]> = {
   FXRP: [10, 500],
-  FLR: [500, 20_000],
-  USDC: [20, 2_000],
+  WFLR: [500, 20_000],
+  USDT: [20, 2_000],
 };
+const DEFAULT_AMOUNT_IN_RANGE: [number, number] = [10, 1_000];
 
 function randomHash(seed: number) {
   return `0x${seed.toString(16).padStart(64, "0")}` as `0x${string}`;
 }
 
 function randomAmountIn(token: TokenSymbol) {
-  const [min, max] = AMOUNT_IN_RANGE[token];
+  const [min, max] = AMOUNT_IN_RANGE[token] ?? DEFAULT_AMOUNT_IN_RANGE;
   return Math.round((min + Math.random() * (max - min)) * 100) / 100;
 }
 

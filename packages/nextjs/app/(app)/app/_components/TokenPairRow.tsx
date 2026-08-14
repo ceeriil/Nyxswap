@@ -2,10 +2,10 @@
 
 import { formatUsd } from "../_lib/format";
 import { getUsdPrice } from "../_lib/mockPool";
-import { TOKENS, type TokenSymbol } from "../_lib/tokens";
+import type { TokenSymbol } from "../_lib/tokens";
 import { TokenSelect } from "./TokenSelect";
-import { formatUnits } from "viem";
-import { useAccount, useBalance } from "wagmi";
+import { useDeployedTestTokens } from "~~/hooks/wallet/useDeployedTestTokens";
+import { useTokenBalance } from "~~/hooks/wallet/useTokenBalance";
 
 const AMOUNT_PATTERN = /^\d*\.?\d*$/;
 
@@ -19,14 +19,9 @@ type Props = {
 };
 
 export const TokenPairRow = ({ label, token, onTokenChange, amount, onAmountChange, readOnly }: Props) => {
-  const { address } = useAccount();
-  const isNative = TOKENS[token].isNative;
-  const { data: nativeBalance } = useBalance({ address, query: { enabled: Boolean(address) && isNative } });
-
-  // No pool/token contract deployed yet (see brief.md's open questions), so
-  // only the connected wallet's native balance is real — everything else is
-  // a placeholder until useScaffoldReadContract has something to read.
-  const balance = isNative && nativeBalance ? Number(formatUnits(nativeBalance.value, nativeBalance.decimals)) : null;
+  const { tokens } = useDeployedTestTokens();
+  const tokenAddress = tokens.find(t => t.symbol === token)?.address;
+  const { balance } = useTokenBalance(tokenAddress);
   const balanceLabel = balance !== null ? balance.toFixed(4) : "0";
 
   const usdEstimate = amount && Number(amount) > 0 ? formatUsd(Number(amount) * getUsdPrice(token)) : null;

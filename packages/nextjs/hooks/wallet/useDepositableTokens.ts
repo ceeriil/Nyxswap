@@ -1,15 +1,15 @@
 "use client";
 
 // ─────────────────────────────────────────────────────────────
-// useDepositableTokens — the deployed Faucet's test-token list, synced
-// from packages/foundry/data/token.json via scripts-js/syncTestTokens.js
-// (run it again after redeploying the faucet/test tokens). Shared by
-// FaucetModal and the wallet page so the two can't drift into showing
-// different lists.
+// useDepositableTokens — thin alias over useDeployedTestTokens, kept as its
+// own name since "depositable" is the meaningful concept at FaucetModal's
+// call site (every deployed test token is claimable/depositable), while
+// "deployed test tokens" is the meaningful concept at the hook's own
+// definition site.
 // ─────────────────────────────────────────────────────────────
 
-import { TEST_TOKENS, type TestToken } from "~~/utils/testTokens";
+import { useDeployedTestTokens, type DeployedTestToken } from "./useDeployedTestTokens";
 
-export function useDepositableTokens(): { tokens: TestToken[]; isLoading: boolean } {
-  return { tokens: TEST_TOKENS, isLoading: false };
+export function useDepositableTokens(): { tokens: DeployedTestToken[]; isLoading: boolean } {
+  return useDeployedTestTokens();
 }

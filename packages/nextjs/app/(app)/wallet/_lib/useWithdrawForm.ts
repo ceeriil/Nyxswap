@@ -13,7 +13,7 @@ export type WithdrawPhase =
 
 export const useWithdrawForm = () => {
   const [tokenA, setTokenAState] = useState<TokenSymbol>("FXRP");
-  const [tokenB, setTokenBState] = useState<TokenSymbol>("FLR");
+  const [tokenB, setTokenBState] = useState<TokenSymbol>("WFLR");
 
   // Ratio-linked, same mechanism as Deposit: only the side the user last
   // typed into is stored, the other side is always derived from the

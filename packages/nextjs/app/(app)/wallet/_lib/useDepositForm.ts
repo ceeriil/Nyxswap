@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 import { getPoolRatio } from "../../app/_lib/mockPool";
-import { TOKENS, type TokenSymbol } from "../../app/_lib/tokens";
+import type { TokenSymbol } from "../../app/_lib/tokens";
 
 export type DepositPhase =
   | "enter-amounts"
@@ -15,7 +15,7 @@ export type DepositPhase =
 
 export const useDepositForm = () => {
   const [tokenA, setTokenAState] = useState<TokenSymbol>("FXRP");
-  const [tokenB, setTokenBState] = useState<TokenSymbol>("FLR");
+  const [tokenB, setTokenBState] = useState<TokenSymbol>("WFLR");
 
   // Ratio-linked amounts: only the side the user last typed into is stored —
   // the other side is always derived from the current pool ratio, so the
@@ -67,8 +67,10 @@ export const useDepositForm = () => {
     [tokenA, tokenB],
   );
 
-  const needsApprovalA = !TOKENS[tokenA].isNative && !approvedTokens.has(tokenA);
-  const needsApprovalB = !TOKENS[tokenB].isNative && !approvedTokens.has(tokenB);
+  // Every deployed test token is a real ERC20 (no native-token case
+  // anymore), so approval is always required until granted.
+  const needsApprovalA = !approvedTokens.has(tokenA);
+  const needsApprovalB = !approvedTokens.has(tokenB);
 
   const derivedPhase: DepositPhase = useMemo(() => {
     if (["approving-a", "approving-b", "confirming", "settled", "failed"].includes(phase)) return phase;

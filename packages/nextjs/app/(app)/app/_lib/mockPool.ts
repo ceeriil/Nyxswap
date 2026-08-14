@@ -1,38 +1,63 @@
 import type { TokenSymbol } from "./tokens";
 
 /**
- * Stand-in AMM pool state and FTSO reference prices. There is no pool
- * contract yet (see brief.md's unresolved LP-share / on-chain-settlement
- * questions) — this drives the swap form's math until real
- * useScaffoldReadContract calls can replace it.
+ * MOCK — stand-in AMM pool state and FTSO reference prices. There is no pool
+ * contract or price oracle wired up yet (see brief.md's unresolved LP-share
+ * / on-chain-settlement questions) — this drives the swap form's math until
+ * real useScaffoldReadContract calls can replace it. The token IDENTITIES
+ * (symbols/addresses) this operates on are real, live-fetched data (see
+ * ~~/hooks/wallet/useDeployedTestTokens) — only the USD prices and pool
+ * reserves below are fabricated placeholders.
  */
-// Reserves are set close to the mock FTSO prices below (small trades should
-// show only a small deviation — a real pool tracks the oracle; only enough
-// price impact from a large trade should push the deviation warning).
-const MOCK_RESERVES: Record<string, { a: TokenSymbol; b: TokenSymbol; reserveA: number; reserveB: number }> = {
-  FXRP_FLR: { a: "FXRP", b: "FLR", reserveA: 500_000, reserveB: 50_200_000 },
-  FXRP_USDC: { a: "FXRP", b: "USDC", reserveA: 1_000_000, reserveB: 2_472_000 },
-  FLR_USDC: { a: "FLR", b: "USDC", reserveA: 40_000_000, reserveB: 981_000 },
+
+// Placeholder USD reference prices, one per deployed test token symbol.
+// Stablecoins pegged near $1, staked-FLR variants tracked close to FLR,
+// ETH-wrapped variants tracked close to ETH - not real market data.
+const MOCK_USD_PRICE: Record<string, number> = {
+  WFLR: 0.0245,
+  sFLR: 0.026,
+  stFLR: 0.0265,
+  SPRK: 0.05,
+  flrETH: 3200,
+  stXRP: 2.55,
+  FXRP: 2.47,
+  USDX: 1,
+  cUSDX: 1,
+  yUSDX: 1,
+  USDT0: 1,
+  "USDC.e": 1,
+  USDT: 1,
+  WETH: 3150,
+  cyWETH: 3150,
+  cysFLR: 0.0248,
+  DINERO: 1,
+  BUGO: 0.01,
+  PiCO: 0.002,
+  JOULE: 0.15,
 };
 
-/** Mock FTSO USD reference prices, used only to derive the deviation check. */
-const MOCK_FTSO_USD_PRICE: Record<TokenSymbol, number> = {
-  FLR: 0.0245,
-  FXRP: 2.47,
-  USDC: 1,
-};
+// Any symbol with no explicit mock price above (a newly deployed test token
+// this file hasn't been updated for) prices at $1 rather than throwing, so
+// the swap form degrades to "flat" quotes instead of breaking.
+function priceOf(token: TokenSymbol): number {
+  return MOCK_USD_PRICE[token] ?? 1;
+}
 
 export const SWAP_FEE_BPS = 30; // 0.3% LP/protocol fee
 export const FTSO_DEVIATION_WARN_PCT = 1;
 
+// Every pair's reserves are derived from a fixed notional USD depth per
+// side rather than a hand-tuned reserves table per pair - scales to any two
+// of the deployed test tokens without an entry per combination.
+const MOCK_POOL_USD_DEPTH = 1_000_000;
+
 function getPool(tokenA: TokenSymbol, tokenB: TokenSymbol) {
-  const direct = MOCK_RESERVES[`${tokenA}_${tokenB}`];
-  if (direct) return direct;
-
-  const inverse = MOCK_RESERVES[`${tokenB}_${tokenA}`];
-  if (inverse) return { a: tokenA, b: tokenB, reserveA: inverse.reserveB, reserveB: inverse.reserveA };
-
-  throw new Error(`No mock pool configured for ${tokenA}/${tokenB}`);
+  return {
+    a: tokenA,
+    b: tokenB,
+    reserveA: MOCK_POOL_USD_DEPTH / priceOf(tokenA),
+    reserveB: MOCK_POOL_USD_DEPTH / priceOf(tokenB),
+  };
 }
 
 export type SwapQuote = {
@@ -42,7 +67,7 @@ export type SwapQuote = {
   priceImpactPct: number;
 };
 
-/** Constant-product (x*y=k) quote, mirroring the real AMM's pricing rules. */
+/** MOCK constant-product (x*y=k) quote, mirroring the real AMM's pricing rules. */
 export function quoteSwap(tokenIn: TokenSymbol, tokenOut: TokenSymbol, amountIn: number): SwapQuote {
   if (!amountIn || amountIn <= 0 || tokenIn === tokenOut) {
     return { amountOut: 0, spotPrice: 0, executionPrice: 0, priceImpactPct: 0 };
@@ -60,16 +85,16 @@ export function quoteSwap(tokenIn: TokenSymbol, tokenOut: TokenSymbol, amountIn:
   return { amountOut, spotPrice, executionPrice, priceImpactPct };
 }
 
-/** Current pool ratio (no fee applied) — used for Vault deposit's ratio-linked amounts. */
+/** MOCK current pool ratio (no fee applied) — used for Vault deposit's ratio-linked amounts. */
 export function getPoolRatio(tokenA: TokenSymbol, tokenB: TokenSymbol) {
   const pool = getPool(tokenA, tokenB);
   return { bPerA: pool.reserveB / pool.reserveA, aPerB: pool.reserveA / pool.reserveB };
 }
 
 export function getFtsoReferencePrice(tokenIn: TokenSymbol, tokenOut: TokenSymbol) {
-  return MOCK_FTSO_USD_PRICE[tokenIn] / MOCK_FTSO_USD_PRICE[tokenOut];
+  return priceOf(tokenIn) / priceOf(tokenOut);
 }
 
 export function getUsdPrice(token: TokenSymbol) {
-  return MOCK_FTSO_USD_PRICE[token];
+  return priceOf(token);
 }

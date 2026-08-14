@@ -2,12 +2,12 @@
 
 import { useEffect } from "react";
 import { TokenIcon } from "~~/components/assets/TokenIcon";
+import type { DeployedTestToken } from "~~/hooks/wallet/useDeployedTestTokens";
 import { useTokenBalance } from "~~/hooks/wallet/useTokenBalance";
 import { fmtUsdFull } from "~~/shared/format";
-import type { TestToken } from "~~/utils/testTokens";
 
 interface TokenBalanceRowProps {
-  token: TestToken;
+  token: DeployedTestToken;
   onBalance?: (address: string, balance: number | null) => void;
   compact?: boolean;
   render?: boolean;

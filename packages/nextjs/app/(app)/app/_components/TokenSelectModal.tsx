@@ -3,17 +3,14 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { formatUsd } from "../_lib/format";
 import { getUsdPrice } from "../_lib/mockPool";
-import { TOKEN_LIST, type TokenSymbol } from "../_lib/tokens";
-import { TokenIcon } from "./TokenIcon";
+import type { TokenSymbol } from "../_lib/tokens";
 import { Address } from "@scaffold-ui/components";
-import { formatUnits } from "viem";
-import { useAccount, useBalance } from "wagmi";
 import { CheckIcon, MagnifyingGlassIcon, XMarkIcon } from "@heroicons/react/24/outline";
+import { TokenIcon } from "~~/components/assets/TokenIcon";
+import { type DeployedTestToken, useDeployedTestTokens } from "~~/hooks/wallet/useDeployedTestTokens";
+import { useTokenBalance } from "~~/hooks/wallet/useTokenBalance";
 import { useTargetNetwork } from "~~/hooks/scaffold-eth";
 
-// No real search-loading source yet (see mockPool.ts) — this simulates the
-// fetch a live price/balance feed would need, so the skeleton state is real.
-const SIMULATED_LOAD_MS = 350;
 const SKELETON_ROWS = 3;
 
 const TokenRowSkeleton = () => (
@@ -38,17 +35,12 @@ type Props = {
   onChange: (token: TokenSymbol) => void;
 };
 
-/** Reusable "select a token" modal: search + scrollable list, skeleton while (simulated) loading. */
+/** Reusable "select a token" modal: search + scrollable list, skeleton while the live token list loads. */
 export const TokenSelectModal = ({ open, onOpenChange, value, onChange }: Props) => {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const [query, setQuery] = useState("");
-  const [loading, setLoading] = useState(true);
-
-  const { address } = useAccount();
-  const { data: nativeBalance } = useBalance({ address, query: { enabled: Boolean(address) && open } });
-  const nativeBalanceAmount = nativeBalance ? Number(formatUnits(nativeBalance.value, nativeBalance.decimals)) : null;
-  const { targetNetwork } = useTargetNetwork();
+  const { tokens, isLoading } = useDeployedTestTokens();
 
   useEffect(() => {
     const dialog = dialogRef.current;
@@ -60,20 +52,15 @@ export const TokenSelectModal = ({ open, onOpenChange, value, onChange }: Props)
   useEffect(() => {
     if (!open) return;
     setQuery("");
-    setLoading(true);
-    const loadTimer = setTimeout(() => setLoading(false), SIMULATED_LOAD_MS);
     const focusTimer = setTimeout(() => searchInputRef.current?.focus(), 0);
-    return () => {
-      clearTimeout(loadTimer);
-      clearTimeout(focusTimer);
-    };
+    return () => clearTimeout(focusTimer);
   }, [open]);
 
   const filteredTokens = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return TOKEN_LIST;
-    return TOKEN_LIST.filter(token => token.symbol.toLowerCase().includes(q) || token.name.toLowerCase().includes(q));
-  }, [query]);
+    if (!q) return tokens;
+    return tokens.filter(token => token.symbol.toLowerCase().includes(q) || token.name.toLowerCase().includes(q));
+  }, [tokens, query]);
 
   const handleSelect = (token: TokenSymbol) => {
     onChange(token);
@@ -113,7 +100,7 @@ export const TokenSelectModal = ({ open, onOpenChange, value, onChange }: Props)
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-5">
-          {loading ? (
+          {isLoading ? (
             <div className="flex flex-col gap-1">
               {Array.from({ length: SKELETON_ROWS }).map((_, i) => (
                 <TokenRowSkeleton key={i} />
@@ -121,51 +108,18 @@ export const TokenSelectModal = ({ open, onOpenChange, value, onChange }: Props)
             </div>
           ) : filteredTokens.length === 0 ? (
             <div className="py-10 text-center text-sm text-base-content/60">
-              No tokens found{query ? ` for "${query}"` : ""}.
+              {tokens.length === 0 ? "No test tokens deployed on this network yet." : `No tokens found${query ? ` for "${query}"` : ""}.`}
             </div>
           ) : (
             <div className="flex flex-col gap-1">
-              {filteredTokens.map(token => {
-                const isSelected = token.symbol === value;
-                const balance = token.isNative ? nativeBalanceAmount : null;
-
-                return (
-                  // A <div> (not <button>) — Address below renders its own copy/explorer
-                  // controls, and a button can't legally nest interactive children.
-                  <div
-                    key={token.symbol}
-                    role="button"
-                    tabIndex={0}
-                    onClick={() => handleSelect(token.symbol)}
-                    onKeyDown={e => {
-                      if (e.key !== "Enter" && e.key !== " ") return;
-                      e.preventDefault();
-                      handleSelect(token.symbol);
-                    }}
-                    className="flex cursor-pointer items-center gap-3 rounded-xl px-2 py-2.5 text-left transition-colors hover:bg-base-200 focus-visible:bg-base-200 focus-visible:outline-none"
-                  >
-                    <TokenIcon symbol={token.symbol} colorClassName={token.avatarClassName} size="md" />
-                    <div className="flex min-w-0 flex-1 flex-col items-start gap-0.5 leading-tight">
-                      <span className="font-semibold">{token.symbol}</span>
-                      <span className="truncate text-xs text-base-content/60">{token.name}</span>
-                      {token.address ? (
-                        <span onClick={e => e.stopPropagation()}>
-                          <Address address={token.address} chain={targetNetwork} format="short" size="xs" />
-                        </span>
-                      ) : (
-                        <span className="text-xs text-base-content/40">Native token</span>
-                      )}
-                    </div>
-                    <div className="flex flex-col items-end leading-tight tabular-nums">
-                      <span className="text-sm font-medium">{formatUsd(getUsdPrice(token.symbol))}</span>
-                      <span className="text-xs text-base-content/50">
-                        {balance !== null ? balance.toFixed(4) : "—"}
-                      </span>
-                    </div>
-                    {isSelected && <CheckIcon className="h-4 w-4 shrink-0 text-base-content" />}
-                  </div>
-                );
-              })}
+              {filteredTokens.map(token => (
+                <TokenRow
+                  key={token.address}
+                  token={token}
+                  isSelected={token.symbol === value}
+                  onSelect={() => handleSelect(token.symbol)}
+                />
+              ))}
             </div>
           )}
         </div>
@@ -179,3 +133,46 @@ export const TokenSelectModal = ({ open, onOpenChange, value, onChange }: Props)
     </dialog>
   );
 };
+
+function TokenRow({
+  token,
+  isSelected,
+  onSelect,
+}: {
+  token: DeployedTestToken;
+  isSelected: boolean;
+  onSelect: () => void;
+}) {
+  const { targetNetwork } = useTargetNetwork();
+  const { balance, isLoading: balanceLoading } = useTokenBalance(token.address);
+
+  return (
+    // A <div> (not <button>) — Address below renders its own copy/explorer
+    // controls, and a button can't legally nest interactive children.
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={onSelect}
+      onKeyDown={e => {
+        if (e.key !== "Enter" && e.key !== " ") return;
+        e.preventDefault();
+        onSelect();
+      }}
+      className="flex cursor-pointer items-center gap-3 rounded-xl px-2 py-2.5 text-left transition-colors hover:bg-base-200 focus-visible:bg-base-200 focus-visible:outline-none"
+    >
+      <TokenIcon symbol={token.symbol} logoURI={token.logoURI} size="md" />
+      <div className="flex min-w-0 flex-1 flex-col items-start gap-0.5 leading-tight">
+        <span className="font-semibold">{token.symbol}</span>
+        <span className="truncate text-xs text-base-content/60">{token.name}</span>
+        <span onClick={e => e.stopPropagation()}>
+          <Address address={token.address} chain={targetNetwork} format="short" size="xs" />
+        </span>
+      </div>
+      <div className="flex flex-col items-end leading-tight tabular-nums">
+        <span className="text-sm font-medium">{formatUsd(getUsdPrice(token.symbol))}</span>
+        <span className="text-xs text-base-content/50">{balanceLoading ? "…" : (balance ?? 0).toFixed(4)}</span>
+      </div>
+      {isSelected && <CheckIcon className="h-4 w-4 shrink-0 text-base-content" />}
+    </div>
+  );
+}

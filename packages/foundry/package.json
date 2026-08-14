@@ -16,7 +16,6 @@
     "format": "make format",
     "postinstall": "shx cp -n .env.example .env",
     "lint": "make lint",
-    "sync-test-tokens": "node scripts-js/syncTestTokens.js",
     "test": "forge test",
     "verify": "make verify RPC_URL=${1:-localhost}"
   },
