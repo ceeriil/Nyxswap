@@ -4,26 +4,30 @@ import { useEffect, useState } from "react";
 import { formatUnits, parseUnits } from "viem";
 import { flareTestnet } from "viem/chains";
 import { useAccount } from "wagmi";
+import { useFaucetModal } from "~~/components/Wallet/FaucetModalProvider";
 import { useScaffoldReadContract, useScaffoldWriteContract } from "~~/hooks/scaffold-eth";
 import { useTargetNetwork } from "~~/hooks/scaffold-eth/useTargetNetwork";
 import { notification } from "~~/utils/scaffold-eth";
 import { contracts } from "~~/utils/scaffold-eth/contract";
 
 type TokenSymbol = "FLR" | "USDT" | "BTC" | "ETH";
-type Tab = "FAUCET" | "DEPOSIT" | "WITHDRAW" | "HISTORY";
+type Tab = "DEPOSIT" | "WITHDRAW" | "HISTORY";
 
 // USDT/BTC/ETH test tokens aren't deployed yet — this UI is a working port for
 // FLR only, with the others wired the same way so they light up once deployed.
-const TOKENS: { symbol: TokenSymbol; contractName: string; faucetAmount: string; decimals: number }[] = [
-  { symbol: "FLR", contractName: "FlrTestToken", faucetAmount: "10000", decimals: 18 },
-  { symbol: "USDT", contractName: "UsdtTestToken", faucetAmount: "100000", decimals: 6 },
-  { symbol: "BTC", contractName: "BtcTestToken", faucetAmount: "1", decimals: 8 },
-  { symbol: "ETH", contractName: "EthTestToken", faucetAmount: "15", decimals: 18 },
+// Getting test tokens into the wallet in the first place is FaucetModal's job
+// (packages/foundry's Faucet.sol claimMany), not this modal's - see the
+// "Get test tokens" button below, which opens that instead of a local tab.
+const TOKENS: { symbol: TokenSymbol; contractName: string; decimals: number }[] = [
+  { symbol: "FLR", contractName: "FlrTestToken", decimals: 18 },
+  { symbol: "USDT", contractName: "UsdtTestToken", decimals: 6 },
+  { symbol: "BTC", contractName: "BtcTestToken", decimals: 8 },
+  { symbol: "ETH", contractName: "EthTestToken", decimals: 18 },
 ];
 
 type HistoryEntry = {
   id: string;
-  type: "MINT" | "DEPOSIT" | "WITHDRAW";
+  type: "DEPOSIT" | "WITHDRAW";
   symbol: TokenSymbol;
   amount: string;
   timestamp: number;
@@ -54,12 +58,12 @@ type WalletModalProps = {
 export const WalletModal = ({ open, onClose }: WalletModalProps) => {
   const { address } = useAccount();
   const { targetNetwork } = useTargetNetwork();
+  const { openFaucet } = useFaucetModal();
 
-  const [tab, setTab] = useState<Tab>("FAUCET");
+  const [tab, setTab] = useState<Tab>("DEPOSIT");
   const [tokenIdx, setTokenIdx] = useState(0);
   const [amount, setAmount] = useState("");
   const [history, setHistory] = useState<HistoryEntry[]>([]);
-  const [isMintingAll, setIsMintingAll] = useState(false);
 
   const flrBalance = useScaffoldReadContract({
     contractName: "FlrTestToken",
@@ -157,33 +161,6 @@ export const WalletModal = ({ open, onClose }: WalletModalProps) => {
     ]);
   };
 
-  const handleMintAll = async () => {
-    if (!address) {
-      notification.error("Connect your wallet first");
-      return;
-    }
-    setIsMintingAll(true);
-    let minted = 0;
-    for (const token of TOKENS) {
-      try {
-        const tx = await writers[token.symbol].writeContractAsync({
-          functionName: "mint",
-          args: [address, parseUnits(token.faucetAmount, token.decimals)],
-        });
-        if (tx) {
-          minted++;
-          addHistory("MINT", token.symbol, token.faucetAmount);
-        }
-      } catch (error) {
-        console.error(`⚡️ ~ file: WalletModal.tsx:handleMintAll ~ ${token.symbol} ~ error`, error);
-      }
-    }
-    setIsMintingAll(false);
-    if (minted > 0) {
-      notification.success(`Minted ${minted}/${TOKENS.length} test tokens`);
-    }
-  };
-
   const handleDeposit = async () => {
     if (!address || !amount) return;
     const tokenAddress = getContractAddress(selectedToken.contractName);
@@ -249,7 +226,18 @@ export const WalletModal = ({ open, onClose }: WalletModalProps) => {
         </div>
 
         <aside className="wallet-side">
-          <h3>Balances</h3>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <h3>Balances</h3>
+            <button
+              className="hdr-btn"
+              onClick={() => {
+                onClose();
+                openFaucet();
+              }}
+            >
+              Get test tokens
+            </button>
+          </div>
           {TOKENS.map(t => (
             <div key={t.symbol} className="bal-row">
               <span className="symbol">{t.symbol}</span>
@@ -277,10 +265,9 @@ export const WalletModal = ({ open, onClose }: WalletModalProps) => {
 
         <main className="wallet-main">
           <div className="wallet-tabs">
-            {(["FAUCET", "DEPOSIT", "WITHDRAW", "HISTORY"] as Tab[]).map(t => (
+            {(["DEPOSIT", "WITHDRAW", "HISTORY"] as Tab[]).map(t => (
               <button key={t} className={tab === t ? "active" : ""} onClick={() => setTab(t)}>
                 <span>{t}</span>
-                {t === "FAUCET" && <span className="sub">testnet only</span>}
                 {t === "DEPOSIT" && <span className="sub">on-chain → tee</span>}
                 {t === "WITHDRAW" && <span className="sub">tee → on-chain</span>}
               </button>
@@ -288,31 +275,6 @@ export const WalletModal = ({ open, onClose }: WalletModalProps) => {
           </div>
 
           <div className="wallet-content">
-            {tab === "FAUCET" && (
-              <>
-                <div className="wallet-note">Mint test tokens directly to your wallet. No real value.</div>
-                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                  {TOKENS.map(t => (
-                    <div
-                      key={t.symbol}
-                      style={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                        fontSize: 11,
-                        color: "var(--w-fg-dim)",
-                      }}
-                    >
-                      <span style={{ fontWeight: 600, color: "var(--w-fg)" }}>{t.symbol}</span>
-                      <span>→ {t.faucetAmount} tokens</span>
-                    </div>
-                  ))}
-                </div>
-                <button className="wallet-submit" onClick={handleMintAll} disabled={isMintingAll || !address}>
-                  {isMintingAll ? "Minting..." : "Mint all test tokens"}
-                </button>
-              </>
-            )}
-
             {tab === "DEPOSIT" && (
               <>
                 <div className="wallet-note">Deposit tokens from your wallet into the TEE exchange.</div>

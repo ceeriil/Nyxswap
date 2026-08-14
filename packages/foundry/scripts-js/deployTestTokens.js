@@ -153,40 +153,50 @@ async function main() {
     return;
   }
 
+  const fromBroadcast = hasFlag("from-broadcast");
   const keystore = getArg("keystore");
   const passwordFile = getArg("password-file");
-  if (!keystore) {
+  if (!fromBroadcast && !keystore) {
     console.error(
       "Usage: node deployTestTokens.js --network <net> --keystore <name> [--password-file <path>]"
     );
     console.error("   or: node deployTestTokens.js --restore-only");
+    console.error(
+      "   or: node deployTestTokens.js --from-broadcast   # re-sync deployedContracts.ts from an already-broadcast deploy, no gas"
+    );
     process.exit(1);
   }
 
-  console.log(
-    `Deploying SeedTokenFactory + ${TOKENS_TO_DEPLOY.map((t) => t.symbol).join(
-      ", "
-    )}...`
-  );
-  const forgeArgs = [
-    "script",
-    "script/mocks/DeployTestTokens.s.sol",
-    "--rpc-url",
-    network,
-    "--account",
-    keystore,
-    "--broadcast",
-    "--ffi",
-  ];
-  if (passwordFile) forgeArgs.push("--password-file", passwordFile);
+  if (fromBroadcast) {
+    console.log(
+      `Re-syncing deployedContracts.ts from the existing broadcast/DeployTestTokens.s.sol/${chainId}/run-latest.json (no deploy)...`
+    );
+  } else {
+    console.log(
+      `Deploying SeedTokenFactory + ${TOKENS_TO_DEPLOY.map((t) => t.symbol).join(
+        ", "
+      )}...`
+    );
+    const forgeArgs = [
+      "script",
+      "script/mocks/DeployTestTokens.s.sol",
+      "--rpc-url",
+      network,
+      "--account",
+      keystore,
+      "--broadcast",
+      "--ffi",
+    ];
+    if (passwordFile) forgeArgs.push("--password-file", passwordFile);
 
-  const result = spawnSync("forge", forgeArgs, {
-    cwd: foundryRoot,
-    encoding: "utf-8",
-    stdio: "inherit",
-  });
-  if (result.status !== 0) {
-    process.exit(1);
+    const result = spawnSync("forge", forgeArgs, {
+      cwd: foundryRoot,
+      encoding: "utf-8",
+      stdio: "inherit",
+    });
+    if (result.status !== 0) {
+      process.exit(1);
+    }
   }
 
   const broadcastPath = join(
@@ -205,19 +215,6 @@ async function main() {
   }
   const factoryAddress = factoryTx.contractAddress;
 
-  const deployCallTxs = broadcast.transactions.filter(
-    (tx) =>
-      tx.transactionType === "CALL" &&
-      tx.transaction.to?.toLowerCase() === factoryAddress.toLowerCase()
-  );
-  if (deployCallTxs.length !== TOKENS_TO_DEPLOY.length) {
-    console.error(
-      `Expected ${TOKENS_TO_DEPLOY.length} deployToken() calls in ${broadcastPath}, found ${deployCallTxs.length}. ` +
-        `Did DeployTestTokens.s.sol change without updating tokens.json (or vice versa)?`
-    );
-    process.exit(1);
-  }
-
   const faucetTx = broadcast.transactions.find(
     (tx) => tx.transactionType === "CREATE" && tx.contractName === "Faucet"
   );
@@ -226,9 +223,6 @@ async function main() {
     process.exit(1);
   }
 
-  const receiptByHash = Object.fromEntries(
-    broadcast.receipts.map((r) => [r.transactionHash, r])
-  );
   const blockByAddress = Object.fromEntries(
     broadcast.receipts.map((r) => [
       r.contractAddress,
@@ -249,23 +243,74 @@ async function main() {
   };
   console.log(`  SeedTokenFactory -> ${factoryAddress}`);
 
-  TOKENS_TO_DEPLOY.forEach((token, i) => {
-    const receipt = receiptByHash[deployCallTxs[i].hash];
-    const log = receipt.logs.find((l) => l.topics[0] === TOKEN_DEPLOYED_TOPIC);
-    if (!log) {
+  if (fromBroadcast) {
+    // This run-latest.json's receipts don't reliably correlate 1:1 with its
+    // transactions by index/hash (seen firsthand: a deployToken() tx's
+    // "receipt" resolved to an unrelated OwnershipTransferred log) - rather
+    // than trust that pairing, ask the already-deployed factory directly via
+    // its own tokenBySymbol(string) view, which is unambiguous ground truth.
+    for (const token of TOKENS_TO_DEPLOY) {
+      const result = spawnSync(
+        "cast",
+        [
+          "call",
+          factoryAddress,
+          "tokenBySymbol(string)(address)",
+          token.symbol,
+          "--rpc-url",
+          network,
+        ],
+        { cwd: foundryRoot, encoding: "utf-8" }
+      );
+      if (result.status !== 0) {
+        console.error(
+          `tokenBySymbol("${token.symbol}") failed: ${result.stderr}`
+        );
+        process.exit(1);
+      }
+      const address = result.stdout.trim();
+      if (!address || address === "0x0000000000000000000000000000000000000000") {
+        console.error(`Factory has no token registered for symbol "${token.symbol}"`);
+        process.exit(1);
+      }
+      entries[token.key] = { address, abi: tokenAbi };
+      console.log(`  ${token.key} -> ${address}`);
+    }
+  } else {
+    const deployCallTxs = broadcast.transactions.filter(
+      (tx) =>
+        tx.transactionType === "CALL" &&
+        tx.transaction.to?.toLowerCase() === factoryAddress.toLowerCase()
+    );
+    if (deployCallTxs.length !== TOKENS_TO_DEPLOY.length) {
       console.error(
-        `No TokenDeployed log found for ${token.symbol} in tx ${deployCallTxs[i].hash}`
+        `Expected ${TOKENS_TO_DEPLOY.length} deployToken() calls in ${broadcastPath}, found ${deployCallTxs.length}. ` +
+          `Did DeployTestTokens.s.sol change without updating tokens.json (or vice versa)?`
       );
       process.exit(1);
     }
-    const address = utils.getAddress(`0x${log.topics[1].slice(-40)}`);
-    entries[token.key] = {
-      address,
-      abi: tokenAbi,
-      deployedOnBlock: parseInt(receipt.blockNumber, 16),
-    };
-    console.log(`  ${token.key} -> ${address}`);
-  });
+    const receiptByHash = Object.fromEntries(
+      broadcast.receipts.map((r) => [r.transactionHash, r])
+    );
+
+    TOKENS_TO_DEPLOY.forEach((token, i) => {
+      const receipt = receiptByHash[deployCallTxs[i].hash];
+      const log = receipt.logs.find((l) => l.topics[0] === TOKEN_DEPLOYED_TOPIC);
+      if (!log) {
+        console.error(
+          `No TokenDeployed log found for ${token.symbol} in tx ${deployCallTxs[i].hash}`
+        );
+        process.exit(1);
+      }
+      const address = utils.getAddress(`0x${log.topics[1].slice(-40)}`);
+      entries[token.key] = {
+        address,
+        abi: tokenAbi,
+        deployedOnBlock: parseInt(receipt.blockNumber, 16),
+      };
+      console.log(`  ${token.key} -> ${address}`);
+    });
+  }
 
   entries.Faucet = {
     address: faucetTx.contractAddress,

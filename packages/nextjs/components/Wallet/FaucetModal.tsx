@@ -1,8 +1,8 @@
 "use client";
 
 // ─────────────────────────────────────────────────────────────
-// FaucetModal — lets a connected wallet claim test tokens (TEST_TOKEN_META,
-// mirroring packages/foundry/script/mocks/tokens.json) from the Faucet
+// FaucetModal — lets a connected wallet claim test tokens (TEST_TOKENS,
+// synced from packages/foundry/data/token.json) from the Faucet
 // contract in one batched claimMany() transaction. Controlled dialog (no
 // own trigger) - opened from the header's FaucetTriggerButton / any
 // WalletNotConnected panel, via FaucetModalProvider's useFaucetModal().

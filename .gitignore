@@ -3,6 +3,7 @@ node_modules
 
 # reference-only code ported from other repos, not part of the build
 packages/nextjs/_reference-fce-orderbook
+/temp
 
 # yarn
 .yarn/*
