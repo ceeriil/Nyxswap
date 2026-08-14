@@ -126,4 +126,112 @@ contract NyxSwapPoolTest is Test {
 
         assertGt(out, 0);
     }
+
+    // --- LP shares ---
+
+    address lp2 = address(0x1111);
+
+    function test_FirstDepositLocksMinimumLiquidityAndMintsRemainderToProvider() public {
+        NyxSwapPool pool = _newPool(INyxSwapPriceOracle(address(0)), 0);
+
+        // _newPool's addReserves(100_000 ether, 100_000 ether) is the first deposit.
+        uint256 expected = 100_000 ether - pool.MINIMUM_LIQUIDITY();
+        assertEq(pool.balanceOf(firstLp()), expected);
+        assertEq(pool.balanceOf(address(pool)), pool.MINIMUM_LIQUIDITY());
+        assertEq(pool.totalSupply(), 100_000 ether);
+    }
+
+    function test_SecondDepositAtSameRatioMintsProportionalShares() public {
+        NyxSwapPool pool = _newPool(INyxSwapPriceOracle(address(0)), 0);
+        uint256 supplyBefore = pool.totalSupply();
+
+        vm.startPrank(lp2);
+        SeedToken(tokenA).mint(10_000 ether);
+        SeedToken(tokenB).mint(10_000 ether);
+        SeedToken(tokenA).approve(address(pool), 10_000 ether);
+        SeedToken(tokenB).approve(address(pool), 10_000 ether);
+        // Depositing exactly 10% of the existing 100_000/100_000 reserves.
+        uint256 minted = pool.addReserves(10_000 ether, 10_000 ether);
+        vm.stopPrank();
+
+        assertEq(minted, supplyBefore / 10);
+        assertEq(pool.balanceOf(lp2), minted);
+    }
+
+    function test_AddReservesRevertsWhenMintedLiquidityRoundsToZero() public {
+        NyxSwapPool pool = _newPool(INyxSwapPriceOracle(address(0)), 0);
+
+        // A big swap skews reserveA away from totalSupply (fees/swaps grow reserves
+        // without minting shares) so a 1-wei deposit's share of the now-larger reserve
+        // truncates to 0 via integer division — a balanced, untouched pool can't
+        // reproduce this, since supply == reserveA == reserveB there.
+        vm.startPrank(trader);
+        SeedToken(tokenA).mint(50_000 ether);
+        SeedToken(tokenA).approve(address(pool), 50_000 ether);
+        pool.swap(true, 50_000 ether, 0);
+        vm.stopPrank();
+
+        vm.startPrank(lp2);
+        SeedToken(tokenA).mint(1);
+        SeedToken(tokenB).mint(1);
+        SeedToken(tokenA).approve(address(pool), 1);
+        SeedToken(tokenB).approve(address(pool), 1);
+        vm.expectRevert("NyxSwap: insufficient liquidity minted");
+        pool.addReserves(1, 1);
+        vm.stopPrank();
+    }
+
+    function test_RemoveReservesReturnsProportionalTokensAndBurnsShares() public {
+        NyxSwapPool pool = _newPool(INyxSwapPriceOracle(address(0)), 0);
+        uint256 lpBalance = pool.balanceOf(firstLp());
+        uint256 supply = pool.totalSupply();
+
+        uint256 toBurn = lpBalance / 2;
+        uint256 expectedA = (toBurn * pool.reserveA()) / supply;
+        uint256 expectedB = (toBurn * pool.reserveB()) / supply;
+
+        uint256 balABefore = SeedToken(tokenA).balanceOf(firstLp());
+        uint256 balBBefore = SeedToken(tokenB).balanceOf(firstLp());
+
+        (uint256 outA, uint256 outB) = pool.removeReserves(toBurn);
+
+        assertEq(outA, expectedA);
+        assertEq(outB, expectedB);
+        assertEq(pool.balanceOf(firstLp()), lpBalance - toBurn);
+        assertEq(SeedToken(tokenA).balanceOf(firstLp()), balABefore + outA);
+        assertEq(SeedToken(tokenB).balanceOf(firstLp()), balBBefore + outB);
+    }
+
+    function test_RemoveReservesRevertsForZeroLiquidity() public {
+        NyxSwapPool pool = _newPool(INyxSwapPriceOracle(address(0)), 0);
+
+        vm.expectRevert("NyxSwap: liquidity zero");
+        pool.removeReserves(0);
+    }
+
+    function test_RemoveReservesRevertsWhenBurningMoreThanOwned() public {
+        NyxSwapPool pool = _newPool(INyxSwapPriceOracle(address(0)), 0);
+
+        vm.prank(lp2);
+        vm.expectRevert();
+        pool.removeReserves(1 ether);
+    }
+
+    function test_AddThenRemoveRoundTripReturnsApproximatelyWhatWasDeposited() public {
+        NyxSwapPool pool = _newPool(INyxSwapPriceOracle(address(0)), 0);
+        uint256 lpBalance = pool.balanceOf(firstLp());
+
+        (uint256 outA, uint256 outB) = pool.removeReserves(lpBalance);
+
+        // MINIMUM_LIQUIDITY stays locked forever, so a full exit by the sole LP
+        // recovers slightly less than the original deposit, not exactly all of it.
+        assertLt(outA, 100_000 ether);
+        assertLt(outB, 100_000 ether);
+        assertApproxEqAbs(outA, 100_000 ether, 1000);
+        assertApproxEqAbs(outB, 100_000 ether, 1000);
+    }
+
+    function firstLp() internal view returns (address) {
+        return address(this);
+    }
 }
