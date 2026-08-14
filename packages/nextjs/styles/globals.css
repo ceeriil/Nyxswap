@@ -195,3 +195,64 @@
     }
   }
 }
+
+/* ─────────────────────────────────────────────────────────────
+   Premium dark glass panels — swap/wallet/vault cards + the input
+   panels nested inside them. Plain (unlayered) CSS so it wins the
+   cascade over daisyUI's @plugin-generated .card styles without
+   needing !important. Extremely subtle: barely-there translucency,
+   a thin gradient-highlight ring (brighter upper-left, softer
+   lower-right), soft ambient shadow, slight backdrop blur — not
+   frosted-glass, not neon.
+   ───────────────────────────────────────────────────────────── */
+.glass-panel,
+.glass-panel-inset {
+  position: relative;
+  background-clip: padding-box;
+}
+.glass-panel::before,
+.glass-panel-inset::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+}
+
+.glass-panel {
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.035);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.025) inset,
+    0 12px 40px rgba(0, 0, 0, 0.25);
+}
+.glass-panel::before {
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.2),
+    rgba(255, 255, 255, 0.08) 35%,
+    rgba(255, 255, 255, 0.04) 70%,
+    rgba(255, 255, 255, 0.12)
+  );
+}
+
+.glass-panel-inset {
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.045);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.02) inset;
+}
+.glass-panel-inset::before {
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.16),
+    rgba(255, 255, 255, 0.06) 40%,
+    rgba(255, 255, 255, 0.03) 75%,
+    rgba(255, 255, 255, 0.1)
+  );
+}

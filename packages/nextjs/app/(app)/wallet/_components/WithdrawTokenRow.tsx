@@ -33,7 +33,7 @@ export const WithdrawTokenRow = ({
   const usdEstimate = amount && Number(amount) > 0 ? formatUsd(Number(amount) * getUsdPrice(token)) : null;
 
   return (
-    <div className="rounded-2xl border border-base-300 bg-base-200/60 p-4">
+    <div className="glass-panel-inset p-4">
       <span className="text-[0.9rem] text-base-content/60">{label}</span>
 
       <div className="mt-1 flex items-center justify-between gap-3">

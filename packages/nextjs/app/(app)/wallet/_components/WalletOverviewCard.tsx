@@ -12,7 +12,7 @@ export const WalletOverviewCard = () => {
   const { openFaucet } = useFaucetModal();
 
   return (
-    <div className="card shadow-xl w-full bg-base-100">
+    <div className="card glass-panel shadow-xl w-full">
       <div className="card-body gap-5">
         <h1 className="card-title">Wallet</h1>
 

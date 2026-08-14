@@ -1,6 +1,5 @@
 "use client";
 
-
 import { useEffect } from "react";
 import { TokenIcon } from "~~/components/assets/TokenIcon";
 import { useTokenBalance } from "~~/hooks/wallet/useTokenBalance";
@@ -26,20 +25,26 @@ export function TokenBalanceRow({ token, onBalance, compact = false, render = tr
   if (!render) return null;
 
   return (
-    <li className={`flex items-center justify-between gap-3 ${compact ? "py-1.5" : "px-3 py-2"}`}>
-      <div className="flex min-w-0 items-center gap-2.5">
-        <TokenIcon symbol={token.symbol} logoURI={token.logoURI} size="sm" />
+    <li
+      className={`group flex items-center justify-between gap-3 rounded-xl ring-1 ring-transparent transition-all duration-200 hover:bg-base-200 hover:ring-primary/25 ${
+        compact ? "px-2 py-1.5" : "px-3 py-2.5"
+      }`}
+    >
+      <div className="flex min-w-0 items-center gap-3">
+        <div className="transition-transform duration-200 group-hover:scale-110">
+          <TokenIcon symbol={token.symbol} logoURI={token.logoURI} size={compact ? "sm" : "md"} />
+        </div>
         <div className="min-w-0">
-          <p className="truncate text-sm text-body">{token.symbol.toUpperCase()}</p>
-          {!compact && <p className="truncate font-mono text-xs text-muted/50">{token.name}</p>}
+          <p className="truncate text-sm transition-colors group-hover:text-primary">{token.symbol.toUpperCase()}</p>
+          {!compact && <p className="truncate text-xs text-base-content/50">{token.name}</p>}
         </div>
       </div>
       <div className="flex shrink-0 flex-col items-end gap-0.5">
-        <span className="font-mono text-xs tabular-nums text-body">
+        <span className="text-xs tabular-nums">
           {isLoading ? "…" : (balance ?? 0).toLocaleString("en-US", { maximumFractionDigits: 2 })}
         </span>
         {usdPrice !== undefined && !isLoading && (
-          <span className="font-mono text-xs tabular-nums text-muted/50">
+          <span className="text-xs tabular-nums text-base-content/50">
             {usdPrice == null ? "-" : fmtUsdFull((balance ?? 0) * usdPrice)}
           </span>
         )}

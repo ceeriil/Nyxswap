@@ -11,7 +11,7 @@
 import { useCallback, useState } from "react";
 import { parseEventLogs } from "viem";
 import { useAccount, usePublicClient, useWriteContract } from "wagmi";
-import { notification } from "~~/utils/scaffold-eth";
+import { useTray } from "~~/components/ui/ActionTray";
 import { FAUCET_ABI, useFaucetContract } from "~~/utils/faucetContract";
 
 export interface FaucetToken {
@@ -29,6 +29,7 @@ export function useFaucet() {
   const { address: account } = useAccount();
   const publicClient = usePublicClient();
   const { writeContractAsync } = useWriteContract();
+  const tray = useTray();
   const [isPending, setIsPending] = useState(false);
 
   const claimMany = useCallback(
@@ -38,6 +39,12 @@ export function useFaucet() {
       if (tokens.length === 0) return undefined;
 
       setIsPending(true);
+      const job = tray.start({
+        title: `Get ${tokens.length} test token${tokens.length === 1 ? "" : "s"}`,
+        steps: ["Submit transaction", "Confirm on chain"],
+      });
+      job.detail("confirm in wallet");
+
       try {
         const hash = await writeContractAsync({
           address: contract.address,
@@ -45,6 +52,8 @@ export function useFaucet() {
           functionName: "claimMany",
           args: [tokens.map(t => t.address)],
         });
+        job.advance();
+        job.detail("waiting for confirmation");
 
         const receipt = await publicClient?.waitForTransactionReceipt({ hash });
 
@@ -62,23 +71,22 @@ export function useFaucet() {
         const claimed = claimedLogs.map(log => symbolFor(log.args.token));
         const skipped = skippedLogs.map(log => symbolFor(log.args.token));
 
-        if (claimed.length > 0) {
-          notification.success(
-            `Claimed ${claimed.length}/${tokens.length} test token${tokens.length === 1 ? "" : "s"}${
-              skipped.length > 0 ? ` (${skipped.join(", ")} on cooldown)` : ""
-            }`,
-          );
-        }
+        job.finish({
+          summary: {
+            claimed: `${claimed.length}/${tokens.length}`,
+            ...(skipped.length > 0 ? { "on cooldown": skipped.join(", ") } : {}),
+          },
+        });
 
         return { claimed, skipped };
       } catch (e) {
-        notification.error(e instanceof Error ? e.message : "Claim failed");
+        job.fail({ message: e instanceof Error ? e.message : "Claim failed" });
         throw e;
       } finally {
         setIsPending(false);
       }
     },
-    [contract, account, publicClient, writeContractAsync],
+    [contract, account, publicClient, writeContractAsync, tray],
   );
 
   return { claimMany, ready: !!contract, connected: !!account, isPending };

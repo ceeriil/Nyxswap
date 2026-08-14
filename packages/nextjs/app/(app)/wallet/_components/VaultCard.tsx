@@ -16,7 +16,7 @@ export const VaultCard = () => {
   const [tab, setTab] = useState<Tab>("deposit");
 
   return (
-    <div className="card shadow-xl w-full max-w-xl">
+    <div className="card glass-panel shadow-xl w-full max-w-xl">
       <div className="card-body gap-4">
         <h1 className="card-title">Vault</h1>
 

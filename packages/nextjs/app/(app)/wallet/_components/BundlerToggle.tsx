@@ -11,7 +11,7 @@ type Props = {
 // broadcast it on the user's behalf. Deposit/Trade have no such leg, so this
 // toggle is Withdraw-only — see brief.md.
 export const BundlerToggle = ({ enabled, onChange, disabled }: Props) => (
-  <div className="flex items-center justify-between rounded-2xl border border-base-300 bg-base-200/40 p-4">
+  <div className="glass-panel-inset flex items-center justify-between p-4">
     <div className="flex flex-col gap-0.5">
       <span className="text-sm font-medium">Bundler</span>
       <span

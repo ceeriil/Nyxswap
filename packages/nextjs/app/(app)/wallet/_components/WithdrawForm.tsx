@@ -33,7 +33,7 @@ export const WithdrawForm = () => {
         />
       </div>
 
-      <div className="rounded-2xl border border-base-300 bg-base-200/60 p-4">
+      <div className="glass-panel-inset p-4">
         <span className="text-[0.9rem] text-base-content/60">To</span>
         <div className="mt-1">
           <AddressInput

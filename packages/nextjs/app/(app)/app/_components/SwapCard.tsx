@@ -19,7 +19,7 @@ export const SwapCard = () => {
   const isSettled = form.phase === "settled" || form.phase === "failed";
 
   return (
-    <div className="card  shadow-xl w-full max-w-xl">
+    <div className="card glass-panel shadow-xl w-full max-w-xl">
       <div className="card-body gap-4">
         <div className="flex items-center justify-between">
           <h1 className="card-title">Swap</h1>
