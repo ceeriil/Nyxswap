@@ -22,8 +22,8 @@ export const menuLinks: HeaderMenuLink[] = [
     icon: <ScaleIcon className="h-4 w-4" />,
   },
   {
-    label: "Vault",
-    href: "/vault",
+    label: "Wallet",
+    href: "/wallet",
     icon: <WalletIcon className="h-4 w-4" />,
   },
   {
