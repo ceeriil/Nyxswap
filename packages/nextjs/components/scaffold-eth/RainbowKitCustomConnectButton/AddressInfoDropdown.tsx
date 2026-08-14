@@ -1,4 +1,4 @@
-import { CSSProperties, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { NetworkOptions } from "./NetworkOptions";
 import {
   PiArrowSquareOutBold,
@@ -25,14 +25,6 @@ import { isENS } from "~~/utils/scaffold-eth/common";
 const BURNER_WALLET_ID = "burnerWallet";
 
 const allowedNetworks = getTargetNetworks();
-
-// Static always-on glint (same defaults Button uses for its plain `glint` prop).
-const GLINT_STYLE = {
-  "--animation-duration": "4s",
-  "--glint-opacity": 0.6,
-  "--glint-opacity-peak": 0.7,
-  "--glint-scale": 1,
-} as CSSProperties;
 
 type AddressInfoDropdownProps = {
   address: Address;
@@ -68,21 +60,12 @@ export const AddressInfoDropdown = ({
     <>
       <details ref={dropdownRef} className="dropdown dropdown-end leading-3">
         <summary className="dropdown-toggle list-none">
-          <div className="glint-button-wrapper" style={GLINT_STYLE}>
-            <div
-              className={cn(
-                "glint-button-content",
-                BUTTON_STYLES.base,
-                BUTTON_STYLES.glintOverrides,
-                "gap-1.5 text-xs! px-2 py-1 h-auto!",
-              )}
-            >
-              <BlockieAvatar address={checkSumAddress} size={18} ensImage={ensAvatar} />
-              <span>
-                {isENS(displayName) ? displayName : checkSumAddress?.slice(0, 6) + "..." + checkSumAddress?.slice(-4)}
-              </span>
-              <PiCaretDownBold size={12} />
-            </div>
+          <div className={cn(BUTTON_STYLES.base, "gap-1.5 text-xs! px-2 py-1 h-auto!")}>
+            <BlockieAvatar address={checkSumAddress} size={18} ensImage={ensAvatar} />
+            <span>
+              {isENS(displayName) ? displayName : checkSumAddress?.slice(0, 6) + "..." + checkSumAddress?.slice(-4)}
+            </span>
+            <PiCaretDownBold size={12} />
           </div>
         </summary>
         <ul className="dropdown-content menu z-10 p-2 mt-2 rounded-box border border-base-300 bg-base-100 shadow-lg shadow-black/10 dark:shadow-black/40 gap-1 min-w-56">

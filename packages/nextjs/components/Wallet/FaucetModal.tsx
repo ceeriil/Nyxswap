@@ -1,9 +1,9 @@
 "use client";
 
 // ─────────────────────────────────────────────────────────────
-// FaucetModal — lets a connected wallet claim test tokens (TEST_TOKENS,
-// synced from packages/foundry/data/token.json) from the Faucet
-// contract in one batched claimMany() transaction. Controlled dialog (no
+// FaucetModal — lets a connected wallet claim test tokens (the live,
+// on-chain-verified list from ~~/hooks/wallet/useDeployedTestTokens) from
+// the Faucet contract in one batched claimMany() transaction. Controlled dialog (no
 // own trigger) - opened from the header's FaucetTriggerButton / any
 // WalletNotConnected panel, via FaucetModalProvider's useFaucetModal().
 //
@@ -20,6 +20,7 @@ import { Dialog } from "@base-ui/react/dialog";
 import { MagnifyingGlassIcon, XMarkIcon } from "@heroicons/react/24/outline";
 import { useAccount, useReadContract } from "wagmi";
 import { TokenIcon } from "~~/components/assets/TokenIcon";
+import { Button } from "~~/components/landing/Button";
 import { useDepositableTokens } from "~~/hooks/wallet/useDepositableTokens";
 import { useFaucet } from "~~/hooks/wallet/useFaucet";
 import { type FaucetContract, useFaucetContract } from "~~/utils/faucetContract";
@@ -261,11 +262,12 @@ function FaucetModalBody({
         <span className="text-xs font-medium uppercase tracking-wide text-base-content/60">
           {selectedClaimable.length} selected
         </span>
-        <button
-          type="button"
+        <Button
+          as="button"
           disabled={!contract || !account || isPending || selectedClaimable.length === 0}
           onClick={handleClaim}
-          className="btn btn-primary btn-sm rounded-full px-5"
+          silver
+          className="px-5! py-1.5! text-sm"
         >
           {!contract
             ? "Faucet not deployed"
@@ -274,7 +276,7 @@ function FaucetModalBody({
               : isPending
                 ? "Claiming…"
                 : "Claim selected"}
-        </button>
+        </Button>
       </div>
     </>
   );

@@ -10,7 +10,7 @@ interface BackgroundLayerProps {
  * (see styles/landing.css for the pure-black base color it sits on top of).
  */
 export const BackgroundLayer = ({
-  image = "/test.png",
+  image = "/test2.png",
   mobileImage = "/images/landing/background-mobile.png",
 }: BackgroundLayerProps) => {
   return (

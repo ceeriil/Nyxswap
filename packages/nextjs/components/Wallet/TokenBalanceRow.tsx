@@ -27,12 +27,12 @@ export function TokenBalanceRow({ token, onBalance, compact = false, render = tr
   return (
     <li
       className={`group flex items-center justify-between gap-3 rounded-xl ring-1 ring-transparent transition-all duration-200 hover:bg-base-200 hover:ring-primary/25 ${
-        compact ? "px-2 py-1.5" : "px-3 py-2.5"
+        compact ? "px-2 py-1.5" : "px-3 py-1"
       }`}
     >
-      <div className="flex min-w-0 items-center gap-3">
+      <div className="flex min-w-0 items-center gap-2.5">
         <div className="transition-transform duration-200 group-hover:scale-110">
-          <TokenIcon symbol={token.symbol} logoURI={token.logoURI} size={compact ? "sm" : "md"} />
+          <TokenIcon symbol={token.symbol} logoURI={token.logoURI} size="sm" />
         </div>
         <div className="min-w-0">
           <p className="truncate text-sm transition-colors group-hover:text-primary">{token.symbol.toUpperCase()}</p>
@@ -40,7 +40,7 @@ export function TokenBalanceRow({ token, onBalance, compact = false, render = tr
         </div>
       </div>
       <div className="flex shrink-0 flex-col items-end gap-0.5">
-        <span className="text-xs tabular-nums">
+        <span className="text-sm font-medium tabular-nums">
           {isLoading ? "…" : (balance ?? 0).toLocaleString("en-US", { maximumFractionDigits: 2 })}
         </span>
         {usdPrice !== undefined && !isLoading && (

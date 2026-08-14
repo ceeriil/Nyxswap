@@ -12,7 +12,7 @@ export const TokenListCard = () => {
 
   return (
     <div className="card glass-panel shadow-xl w-full">
-      <div className="card-body gap-3 p-5">
+      <div className="card-body gap-3 p-5 px-8">
         <div className="flex items-center justify-between">
           <h2 className="card-title text-base">Your tokens</h2>
           <span className="text-xs text-base-content/50">{tokens.length} tokens</span>
@@ -27,8 +27,8 @@ export const TokenListCard = () => {
             <span className="text-sm text-base-content/60">No faucet tokens deployed on this network yet.</span>
           </div>
         ) : (
-          <div className="max-h-96 overflow-y-auto">
-            <ul className="flex flex-col divide-y divide-base-300/60">
+          <div className="max-h-96 overflow-y-auto px-1 py-3">
+            <ul className="flex flex-col gap-0.5">
               {tokens.map((t, i) => (
                 <TokenBalanceRow
                   key={t.address}

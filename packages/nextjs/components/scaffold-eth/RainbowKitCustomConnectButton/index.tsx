@@ -37,7 +37,7 @@ export const RainbowKitCustomConnectButton = () => {
             {(() => {
               if (!connected) {
                 return (
-                  <Button glint as="button" onClick={openConnectModal} speed={3} className="!text-xs px-4 py-1.5">
+                  <Button as="button" onClick={openConnectModal} className="!text-xs px-4 py-1.5">
                     Connect Wallet
                   </Button>
                 );

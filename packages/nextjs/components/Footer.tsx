@@ -32,7 +32,6 @@ export const Footer = () => {
               <div>
                 <Button
                   as="button"
-                  glint
                   className="rounded-full px-2.5 py-1 sm:px-2.5 sm:py-1 text-xs font-normal gap-1 cursor-auto"
                 >
                   <CurrencyDollarIcon className="h-3.5 w-3.5" />
@@ -43,7 +42,6 @@ export const Footer = () => {
             {isFaucetNetwork && !teeStatusLoading && (
               <Button
                 as="button"
-                glint
                 className="rounded-full px-2.5 py-1 sm:px-2.5 sm:py-1 text-xs font-normal gap-1.5 cursor-auto"
               >
                 <span
