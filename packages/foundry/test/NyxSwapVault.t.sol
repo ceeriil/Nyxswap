@@ -5,6 +5,7 @@ import { Test } from "forge-std/Test.sol";
 import { NyxSwapVault } from "../contracts/NyxSwapVault.sol";
 import { NyxSwapPool } from "../contracts/NyxSwapPool.sol";
 import { INyxSwapPool } from "../contracts/interfaces/INyxSwapPool.sol";
+import { INyxSwapPriceOracle } from "../contracts/interfaces/INyxSwapPriceOracle.sol";
 import { IERC20 as INyxIERC20 } from "../contracts/interfaces/IERC20.sol";
 import { SeedTokenFactory } from "../contracts/token/SeedTokenFactory.sol";
 import { SeedToken } from "../contracts/token/SeedToken.sol";
@@ -33,7 +34,7 @@ contract NyxSwapVaultTest is Test {
         tokenA = factory.deployToken("Token A", "AAA");
         tokenB = factory.deployToken("Token B", "BBB");
 
-        pool = new NyxSwapPool(INyxIERC20(tokenA), INyxIERC20(tokenB));
+        pool = new NyxSwapPool(INyxIERC20(tokenA), INyxIERC20(tokenB), INyxSwapPriceOracle(address(0)), 0);
 
         SeedToken(tokenA).approve(address(pool), type(uint256).max);
         SeedToken(tokenB).approve(address(pool), type(uint256).max);

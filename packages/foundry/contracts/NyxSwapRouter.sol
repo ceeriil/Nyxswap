@@ -2,13 +2,18 @@
 pragma solidity >=0.8.0 <0.9.0;
 
 import { INyxSwapPool } from "./interfaces/INyxSwapPool.sol";
+import { INyxSwapPriceOracle } from "./interfaces/INyxSwapPriceOracle.sol";
 import { IERC20 } from "./interfaces/IERC20.sol";
+import { NyxSwapPool } from "./NyxSwapPool.sol";
 
 /// @title NyxSwap Router
 /// @notice Multi-hop swap routing over NyxSwapPool instances, plus off-chain quoting.
-/// Pools are registered permissionlessly — anyone can register a deployed NyxSwapPool,
-/// keyed by its own (tokenA, tokenB) pair, since the pool itself is the source of truth
-/// for which tokens it holds. One pool per unordered token pair.
+/// Pools are created BY this router, not registered from an arbitrary caller-supplied
+/// address — createPool deploys the real NyxSwapPool itself via `new`, so there's no
+/// address to lie about (unlike a registry that trusts whatever contract it's handed,
+/// which is squattable: an attacker could front-run legitimate registration with a
+/// contract that reports the right tokenA()/tokenB() but a malicious swap()). Mirrors
+/// how Uniswap V2's factory works, for the same reason. One pool per unordered pair.
 /// @dev No addLiquidity/removeLiquidity here — NyxSwapPool.addReserves is an explicit
 /// placeholder (LP-share design is still undecided, see brief.md), so wrapping it in a
 /// Router now would bake in the wrong shape. This only routes swaps against whatever
@@ -21,40 +26,51 @@ contract NyxSwapRouter {
     uint256 public constant SWAP_FEE_BPS = 30;
     uint256 private constant BPS_DENOMINATOR = 10_000;
 
+    /// @notice Oracle (if any) and deviation tolerance every pool this router creates is
+    /// wired up with. One consistent policy for the whole router, set once at deploy time.
+    INyxSwapPriceOracle public immutable priceOracle;
+    uint256 public immutable maxDeviationBps;
+
     mapping(address => mapping(address => INyxSwapPool)) public poolFor;
 
-    event PoolRegistered(address indexed tokenA, address indexed tokenB, address indexed pool);
+    event PoolCreated(address indexed tokenA, address indexed tokenB, address indexed pool);
 
-    error IdenticalTokens();
-    error PoolAlreadyRegistered();
+    error PoolAlreadyExists();
     error PathTooShort();
     error Expired();
     error InsufficientOutputAmount();
     error PoolNotFound(address tokenIn, address tokenOut);
+    error ZeroAddress();
+    error CannotSendToRouter();
 
     modifier ensure(uint256 deadline) {
         if (block.timestamp > deadline) revert Expired();
         _;
     }
 
-    /// @notice Registers `pool` for its own (tokenA, tokenB) pair, in both directions.
-    /// Permissionless — the pool's own immutable tokenA/tokenB is the source of truth,
-    /// so there's nothing for a caller to lie about beyond wasting their own gas.
-    function registerPool(INyxSwapPool pool) external {
-        address tokenA = address(pool.tokenA());
-        address tokenB = address(pool.tokenB());
-        if (tokenA == tokenB) revert IdenticalTokens();
-        if (address(poolFor[tokenA][tokenB]) != address(0)) revert PoolAlreadyRegistered();
+    constructor(INyxSwapPriceOracle _priceOracle, uint256 _maxDeviationBps) {
+        priceOracle = _priceOracle;
+        maxDeviationBps = _maxDeviationBps;
+    }
 
-        poolFor[tokenA][tokenB] = pool;
-        poolFor[tokenB][tokenA] = pool;
-        emit PoolRegistered(tokenA, tokenB, address(pool));
+    /// @notice Deploys a NyxSwapPool for (tokenA, tokenB) and registers it, in both
+    /// directions. Reverts (via NyxSwapPool's own constructor) on identical or zero
+    /// token addresses. One pool per unordered pair — reverts if one already exists.
+    function createPool(IERC20 tokenA, IERC20 tokenB) external returns (address pool) {
+        address a = address(tokenA);
+        address b = address(tokenB);
+        if (address(poolFor[a][b]) != address(0)) revert PoolAlreadyExists();
+
+        pool = address(new NyxSwapPool(tokenA, tokenB, priceOracle, maxDeviationBps));
+        poolFor[a][b] = INyxSwapPool(pool);
+        poolFor[b][a] = INyxSwapPool(pool);
+        emit PoolCreated(a, b, pool);
     }
 
     /// @notice Swaps an exact amount of path[0] for as much as possible of path[last],
-    /// hopping through a registered pool for each consecutive pair in `path`. Only the
-    /// final output is slippage-checked against `amountOutMin` — matches how Uniswap V2's
-    /// router handles multi-hop paths.
+    /// hopping through a pool for each consecutive pair in `path`. Only the final output
+    /// is slippage-checked against `amountOutMin` — matches how Uniswap V2's router
+    /// handles multi-hop paths.
     /// @param amountIn Exact amount of path[0] to pull from the caller.
     /// @param amountOutMin Reverts if the final output is below this.
     /// @param path Token addresses defining the route; path[0] is input, path[last] is output.
@@ -68,6 +84,8 @@ contract NyxSwapRouter {
         uint256 deadline
     ) external ensure(deadline) returns (uint256[] memory amounts) {
         if (path.length < 2) revert PathTooShort();
+        if (to == address(0)) revert ZeroAddress();
+        if (to == address(this)) revert CannotSendToRouter();
 
         amounts = new uint256[](path.length);
         amounts[0] = amountIn;
@@ -89,9 +107,7 @@ contract NyxSwapRouter {
         uint256 finalAmount = amounts[amounts.length - 1];
         if (finalAmount < amountOutMin) revert InsufficientOutputAmount();
 
-        if (to != address(this)) {
-            require(IERC20(path[path.length - 1]).transfer(to, finalAmount), "NyxSwap: transfer failed");
-        }
+        require(IERC20(path[path.length - 1]).transfer(to, finalAmount), "NyxSwap: transfer failed");
     }
 
     /// @notice Previews `swapExactTokensForTokens`'s output for `path`, without a state
