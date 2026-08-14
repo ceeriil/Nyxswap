@@ -9,7 +9,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 
-	"extension-scaffold/pkg/orderbook"
+	"extension-scaffold/pkg/auction"
 )
 
 // --- Deposit (on-chain instruction) ---
@@ -111,30 +111,50 @@ func CanonicalWithdrawRequestBytes(contract, user, token, to common.Address, amo
 	)
 }
 
-// --- Place Order (off-chain direct action) ---
+// --- Swap (off-chain direct action) ---
+//
+// A SWAP is a Dutch-auction intent, not an instantly-executed trade — see
+// pkg/auction's package doc for the model (1inch Fusion's approach, adapted
+// to a single TEE resolver instead of a competing resolver network). It
+// resolves asynchronously: the SWAP handler itself only validates, holds
+// funds, and creates the order — status is always 2 (pending) in its
+// ActionResult. Poll GET_MY_STATE for the eventual outcome. This split
+// exists because the extension's request/response cycle is fully
+// synchronous and serialized (see docs/extension-contract.md §5) — a
+// handler that blocked until the order resolved would freeze every other
+// request against the extension for the same duration.
 
-// PlaceOrderRequest is the JSON payload for a PLACE_ORDER direct action.
-// Every order is a limit order — see orderbook.Order's doc comment for why
-// there's no separate market-order type.
-type PlaceOrderRequest struct {
-	Sender   string         `json:"sender"`
-	Pair     string         `json:"pair"`
-	Side     orderbook.Side `json:"side"`
-	Price    uint64         `json:"price"`
-	Quantity uint64         `json:"quantity"`
+// SwapRequest is the JSON payload for a SWAP direct action.
+type SwapRequest struct {
+	Sender   string       `json:"sender"`
+	Pair     string       `json:"pair"`
+	Side     auction.Side `json:"side"`
+	Quantity uint64       `json:"quantity"`
+	// MinAcceptablePrice is the worst price the sender will accept — same
+	// role as NyxSwapPool.swap()'s minAmountOut. The auction's FloorPrice
+	// never goes past this: if the pool can't meet it by the time the order
+	// expires, the order simply doesn't fill (funds released), the same
+	// "swap doesn't execute" outcome ordinary slippage protection produces
+	// elsewhere in this codebase — never a worse-than-tolerated fill.
+	MinAcceptablePrice uint64 `json:"minAcceptablePrice"`
 }
 
-// PlaceOrderResponse is the JSON payload returned in ActionResult.Data.
-type PlaceOrderResponse struct {
-	OrderID   string            `json:"orderId"`
-	Status    string            `json:"status"` // "filled", "partial", "resting"
-	Matches   []orderbook.Match `json:"matches,omitempty"`
-	Remaining uint64            `json:"remaining"`
-	PoolFill  *PoolFillResponse `json:"poolFill,omitempty"`
+// SwapResponse is the JSON payload included (best-effort — data is only
+// contractually meaningful for status == 1, see §4.6) alongside a SWAP
+// request's immediate status-2 ActionResult. OrderID is what a client needs
+// to correlate this submission with its eventual GET_MY_STATE entry.
+type SwapResponse struct {
+	OrderID    string       `json:"orderId"`
+	Pair       string       `json:"pair"`
+	Side       auction.Side `json:"side"`
+	Quantity   uint64       `json:"quantity"`
+	StartPrice uint64       `json:"startPrice"`
+	FloorPrice uint64       `json:"floorPrice"`
+	ExpiresAt  int64        `json:"expiresAt"` // unix nanoseconds
 }
 
 // PoolFillResponse is a TEE-signed authorization for NyxSwapVault.fillFromPool,
-// covering whatever quantity of an order the orderbook couldn't match
+// covering whatever quantity of an order the auction couldn't match
 // peer-to-peer. Same "TEE signs, anyone relays" pattern as WithdrawResponse:
 // this JSON is public and carriable by any third party, and it authorizes
 // nothing except exactly this (pool, aToB, amountIn, minAmountOut) swap, once,
@@ -149,20 +169,94 @@ type PoolFillResponse struct {
 	Signature    hexutil.Bytes  `json:"signature"`
 }
 
-// --- Cancel Order (off-chain direct action) ---
+// --- Cancel Swap (off-chain direct action) ---
 
-// CancelOrderRequest is the JSON payload for a CANCEL_ORDER direct action.
-type CancelOrderRequest struct {
+// CancelSwapRequest is the JSON payload for a CANCEL_SWAP direct action.
+type CancelSwapRequest struct {
 	Sender  string `json:"sender"`
 	OrderID string `json:"orderId"`
 }
 
-// CancelOrderResponse is the JSON payload returned in ActionResult.Data.
-type CancelOrderResponse struct {
+// CancelSwapResponse is the JSON payload returned in ActionResult.Data.
+type CancelSwapResponse struct {
 	OrderID   string `json:"orderId"`
 	Pair      string `json:"pair"`
 	Side      string `json:"side"`
 	Remaining uint64 `json:"remaining"`
+}
+
+// --- Get My State (off-chain direct action) ---
+//
+// The only channel that returns a caller's own private orders/history —
+// GET /state (unauthenticated) deliberately never does, see its doc
+// comment in internal/extension/extension.go. Authenticated the same way
+// WITHDRAW_REQUEST is: an inner signature over canonical bytes, not
+// msg.sender transport, so a gasless account can poll it too.
+
+// GetMyStateDomain is the canonical-encoding domain separator for
+// GET_MY_STATE requests — distinct from WithdrawRequestDomain so a
+// WITHDRAW_REQUEST signature can never be replayed as a valid
+// GET_MY_STATE proof, or vice versa.
+var GetMyStateDomain = mkDomain("NyxSwapGetMyStateV1")
+
+// GetMyStateRequest is the JSON payload for a GET_MY_STATE direct action.
+// Timestamp must be within config.GetMyStateMaxSkew of the TEE's clock, or
+// the request is rejected — bounds how long a leaked signature could be
+// replayed to keep reading someone's state without their ongoing consent.
+type GetMyStateRequest struct {
+	User      string        `json:"user"`
+	Timestamp int64         `json:"timestamp"`
+	Signature hexutil.Bytes `json:"signature"`
+}
+
+// CanonicalGetMyStateBytes returns the byte-string signed for a
+// GET_MY_STATE request. Layout: abi.encode(domain, user, timestamp). The
+// frontend must produce the identical encoding.
+func CanonicalGetMyStateBytes(user common.Address, timestamp int64) ([]byte, error) {
+	bytes32Ty, err := abi.NewType("bytes32", "", nil)
+	if err != nil {
+		return nil, fmt.Errorf("bytes32 type: %w", err)
+	}
+	addrTy, err := abi.NewType("address", "", nil)
+	if err != nil {
+		return nil, fmt.Errorf("address type: %w", err)
+	}
+	int64Ty, err := abi.NewType("int64", "", nil)
+	if err != nil {
+		return nil, fmt.Errorf("int64 type: %w", err)
+	}
+	args := abi.Arguments{{Type: bytes32Ty}, {Type: addrTy}, {Type: int64Ty}}
+	return args.Pack(GetMyStateDomain, user, timestamp)
+}
+
+// LiveOrderView is one still-pending order in a GetMyStateResponse.
+type LiveOrderView struct {
+	OrderID      string       `json:"orderId"`
+	Pair         string       `json:"pair"`
+	Side         auction.Side `json:"side"`
+	Quantity     uint64       `json:"quantity"`
+	Remaining    uint64       `json:"remaining"`
+	CurrentPrice uint64       `json:"currentPrice"`
+	ExpiresAt    int64        `json:"expiresAt"`
+}
+
+// ResolvedOrderView is one finished order (filled, partially filled, or
+// expired unfilled) in a GetMyStateResponse.
+type ResolvedOrderView struct {
+	OrderID    string            `json:"orderId"`
+	Pair       string            `json:"pair"`
+	Side       auction.Side      `json:"side"`
+	Status     string            `json:"status"` // "filled", "partial", "expired"
+	Matches    []auction.Match   `json:"matches,omitempty"`
+	PoolFill   *PoolFillResponse `json:"poolFill,omitempty"`
+	Remaining  uint64            `json:"remaining"`
+	ResolvedAt int64             `json:"resolvedAt"`
+}
+
+// GetMyStateResponse is the JSON payload returned in ActionResult.Data.
+type GetMyStateResponse struct {
+	LiveOrders []LiveOrderView     `json:"liveOrders"`
+	Resolved   []ResolvedOrderView `json:"resolved"`
 }
 
 // State holds the extension's observable state, returned by GET /state.

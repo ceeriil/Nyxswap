@@ -26,8 +26,8 @@ const (
 	OPCommandDeposit       = "DEPOSIT"
 	OPCommandWithdraw      = "WITHDRAW"
 	OPCommandFsaOp         = "FSA_OP"
-	OPCommandPlaceOrder    = "PLACE_ORDER"
-	OPCommandCancelOrder   = "CANCEL_ORDER"
+	OPCommandSwap          = "SWAP"
+	OPCommandCancelSwap    = "CANCEL_SWAP"
 	OPCommandGetMyState    = "GET_MY_STATE"
 	OPCommandExportHistory = "EXPORT_HISTORY"
 
@@ -44,6 +44,23 @@ const (
 	DefaultMasterAccountController = "0x434936d47503353f06750Db1A444DBDC5F0AD37c"
 
 	TimeoutShutdown = 5 * time.Second
+
+	// DefaultSwapAuctionDuration is how long a SWAP order's acceptable price
+	// takes to decay from its favorable StartPrice down to its
+	// guaranteed-fillable FloorPrice (the pool's spot price at submission).
+	// See pkg/auction's package doc for the model this implements.
+	DefaultSwapAuctionDuration = 10 * time.Second
+
+	// DefaultResolverInterval is how often the background resolver re-checks
+	// every live SWAP order's current decayed price. Independent of
+	// SwapAuctionDuration — a shorter interval just means finer-grained
+	// price checks within the same overall auction window.
+	DefaultResolverInterval = 2 * time.Second
+
+	// GetMyStateMaxSkew bounds how long a signed GET_MY_STATE request stays
+	// valid after its Timestamp — a leaked signature can only be replayed to
+	// keep reading someone's private state within this window, not forever.
+	GetMyStateMaxSkew = 30 * time.Second
 )
 
 // Defaults.
@@ -68,6 +85,9 @@ var (
 	MasterAccountController = DefaultMasterAccountController
 	InstructionSender       string
 	VaultAddress            string
+
+	SwapAuctionDuration = DefaultSwapAuctionDuration
+	ResolverInterval    = DefaultResolverInterval
 )
 
 // TradingPairConfig maps a pair name to its base/quote token addresses and
@@ -146,6 +166,16 @@ func init() {
 			if addr != "" {
 				AdminAddresses = append(AdminAddresses, strings.ToLower(addr))
 			}
+		}
+	}
+	if v := os.Getenv("SWAP_AUCTION_DURATION_SECONDS"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			SwapAuctionDuration = time.Duration(n) * time.Second
+		}
+	}
+	if v := os.Getenv("RESOLVER_INTERVAL_MS"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			ResolverInterval = time.Duration(n) * time.Millisecond
 		}
 	}
 

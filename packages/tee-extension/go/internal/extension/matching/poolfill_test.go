@@ -2,8 +2,9 @@ package matching
 
 import (
 	"testing"
+	"time"
 
-	"extension-scaffold/pkg/orderbook"
+	"extension-scaffold/pkg/auction"
 
 	"github.com/ethereum/go-ethereum/common"
 )
@@ -14,13 +15,16 @@ import (
 func TestTryPoolFill_NoPoolConfigured(t *testing.T) {
 	e, _ := newTestEngine()
 	pairCfg := e.pairs[testPair] // PoolAddress left zero
+	now := time.Now()
 
-	order := &orderbook.Order{
+	order := &auction.Order{
 		ID: "ORD-1", Owner: testSeller, Pair: testPair,
-		Side: orderbook.Sell, Price: 2_000_000, Quantity: 100, Remaining: 100,
+		Side: auction.Sell, Quantity: 100, Remaining: 100,
+		StartPrice: 2_000_000, FloorPrice: 2_000_000,
+		SubmittedAt: now, Duration: time.Minute,
 	}
 
-	fill, err := e.tryPoolFill(pairCfg, order)
+	fill, err := e.tryPoolFill(pairCfg, order, now)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -31,20 +35,23 @@ func TestTryPoolFill_NoPoolConfigured(t *testing.T) {
 
 // TestTryPoolFill_NoFallbackConfigured confirms the same graceful no-op
 // when a pool IS configured but this Engine has no poolFallback wired up
-// (e.g. CHAIN_URL unset). Pool fallback degrades to "just rest it", never a
-// hard failure.
+// (e.g. CHAIN_URL unset). Pool fallback degrades to "just leave it live",
+// never a hard failure.
 func TestTryPoolFill_NoFallbackConfigured(t *testing.T) {
 	e, _ := newTestEngine()
 	pairCfg := e.pairs[testPair]
 	pairCfg.PoolAddress = common.HexToAddress("0x33")
 	e.pairs[testPair] = pairCfg
+	now := time.Now()
 
-	order := &orderbook.Order{
+	order := &auction.Order{
 		ID: "ORD-2", Owner: testSeller, Pair: testPair,
-		Side: orderbook.Sell, Price: 2_000_000, Quantity: 100, Remaining: 100,
+		Side: auction.Sell, Quantity: 100, Remaining: 100,
+		StartPrice: 2_000_000, FloorPrice: 2_000_000,
+		SubmittedAt: now, Duration: time.Minute,
 	}
 
-	fill, err := e.tryPoolFill(pairCfg, order)
+	fill, err := e.tryPoolFill(pairCfg, order, now)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}

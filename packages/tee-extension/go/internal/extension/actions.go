@@ -71,16 +71,38 @@ func (e *Extension) processWithdrawRequest(action teetypes.Action, df *instructi
 	return buildResult(action, df, data, 1, nil)
 }
 
-// --- PLACE_ORDER / CANCEL_ORDER (see internal/extension/matching) ---
+// --- SWAP / CANCEL_SWAP / GET_MY_STATE (see internal/extension/matching) ---
 
-// processPlaceOrder handles PLACE_ORDER direct actions.
-func (e *Extension) processPlaceOrder(action teetypes.Action, df *instruction.DataFixed, msg hexutil.Bytes) teetypes.ActionResult {
-	var req types.PlaceOrderRequest
+// processSwap handles SWAP direct actions. Unlike every other handler in
+// this file, this always returns status 2 (pending), never 1 — Swap only
+// validates and creates the order, it never resolves it inline (see
+// types.SwapRequest's doc comment for why: this extension's request cycle
+// is fully synchronous and serialized, so blocking here would freeze every
+// other request for as long as the order took to resolve). Poll
+// GET_MY_STATE for the eventual outcome.
+func (e *Extension) processSwap(action teetypes.Action, df *instruction.DataFixed, msg hexutil.Bytes) teetypes.ActionResult {
+	var req types.SwapRequest
 	if err := json.Unmarshal(msg, &req); err != nil {
 		return buildResult(action, df, nil, 0, fmt.Errorf("decoding request: %w", err))
 	}
 
-	resp, err := e.matching.PlaceOrder(req)
+	resp, err := e.matching.Swap(req)
+	if err != nil {
+		return buildResult(action, df, nil, 0, err)
+	}
+	data, _ := json.Marshal(resp)
+
+	return buildResult(action, df, data, 2, nil)
+}
+
+// processCancelSwap handles CANCEL_SWAP direct actions.
+func (e *Extension) processCancelSwap(action teetypes.Action, df *instruction.DataFixed, msg hexutil.Bytes) teetypes.ActionResult {
+	var req types.CancelSwapRequest
+	if err := json.Unmarshal(msg, &req); err != nil {
+		return buildResult(action, df, nil, 0, fmt.Errorf("decoding request: %w", err))
+	}
+
+	resp, err := e.matching.CancelSwap(req)
 	if err != nil {
 		return buildResult(action, df, nil, 0, err)
 	}
@@ -89,14 +111,16 @@ func (e *Extension) processPlaceOrder(action teetypes.Action, df *instruction.Da
 	return buildResult(action, df, data, 1, nil)
 }
 
-// processCancelOrder handles CANCEL_ORDER direct actions.
-func (e *Extension) processCancelOrder(action teetypes.Action, df *instruction.DataFixed, msg hexutil.Bytes) teetypes.ActionResult {
-	var req types.CancelOrderRequest
+// processGetMyState handles GET_MY_STATE direct actions — the authenticated,
+// per-caller counterpart to the unauthenticated GET /state (see
+// stateHandler's doc comment in extension.go).
+func (e *Extension) processGetMyState(action teetypes.Action, df *instruction.DataFixed, msg hexutil.Bytes) teetypes.ActionResult {
+	var req types.GetMyStateRequest
 	if err := json.Unmarshal(msg, &req); err != nil {
 		return buildResult(action, df, nil, 0, fmt.Errorf("decoding request: %w", err))
 	}
 
-	resp, err := e.matching.CancelOrder(req)
+	resp, err := e.matching.GetMyState(req)
 	if err != nil {
 		return buildResult(action, df, nil, 0, err)
 	}

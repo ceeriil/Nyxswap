@@ -24,27 +24,28 @@ var (
 )
 
 // newTestEngine builds a minimal Engine wired up for testPair, with no pool
-// fallback.
+// fallback and no reader (spot pricing falls back to each request's own
+// MinAcceptablePrice — see swap.go's startPriceFor).
 func newTestEngine() (*Engine, *balance.Manager) {
 	pairs := map[string]config.TradingPairConfig{
 		testPair: {Name: testPair, BaseToken: testBase, QuoteToken: testQuote},
 	}
 	balances := balance.NewManager()
-	return New(pairs, balances, nil), balances
+	return New(pairs, balances, nil, nil), balances
 }
 
-func placeOrderExpectErr(t *testing.T, e *Engine, req types.PlaceOrderRequest) string {
+func swapExpectErr(t *testing.T, e *Engine, req types.SwapRequest) string {
 	t.Helper()
-	_, err := e.PlaceOrder(req)
+	_, err := e.Swap(req)
 	if err == nil {
 		t.Fatal("expected an error, got success")
 	}
 	return err.Error()
 }
 
-func cancelOrderExpectErr(t *testing.T, e *Engine, req types.CancelOrderRequest) string {
+func cancelSwapExpectErr(t *testing.T, e *Engine, req types.CancelSwapRequest) string {
 	t.Helper()
-	_, err := e.CancelOrder(req)
+	_, err := e.CancelSwap(req)
 	if err == nil {
 		t.Fatal("expected an error, got success")
 	}

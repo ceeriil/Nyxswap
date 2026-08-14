@@ -24,7 +24,10 @@ import (
 	"github.com/flare-foundation/tee-node/pkg/processorutils"
 )
 
-// Extension is the dark-pool trading extension's dispatch root. It owns no
+// Extension is NyxSwap's TEE extension dispatch root — reserves stay fully
+// public and verifiable (see NyxSwapPool.sol), only a pending SWAP's own
+// details are ever hidden here before it resolves. Not a dark pool: nothing
+// about pool depth or settled activity is opaque, see brief.md. It owns no
 // state of its own — every piece of mutable TEE state (balances, the
 // matching engine, FSA bindings, deposit/withdrawal history) lives in one
 // of its component packages, each guarding itself. Extension's only job is
@@ -34,7 +37,7 @@ type Extension struct {
 	Server *http.Server
 
 	vault    *vault.Handler   // DEPOSIT/WITHDRAW/WITHDRAW_REQUEST against NyxSwapVault
-	matching *matching.Engine // PLACE_ORDER/CANCEL_ORDER trading engine
+	matching *matching.Engine // SWAP/CANCEL_SWAP/GET_MY_STATE auction engine
 }
 
 // --- DO NOT MODIFY: New(), actionHandler() structure is boilerplate. ---
@@ -51,19 +54,28 @@ func New(extensionPort, signPort int) *Extension {
 		pairs[pair.Name] = pair
 	}
 
-	// Pool fallback is optional: a dial failure or unset CHAIN_URL disables
-	// it (poolFallback stays nil), it never blocks extension startup.
+	// Pool fallback (and spot-price reading for SWAP's decay curve) is
+	// optional: a dial failure or unset CHAIN_URL disables both — dialedReader
+	// stays a true nil interface (not a nil *poolfallback.Reader wrapped in a
+	// non-nil interface, which would panic on first use — see
+	// matching.ReserveReader's doc comment), poolFallback stays nil. Neither
+	// ever blocks extension startup.
 	var poolFallback *poolfallback.Fallback
+	var dialedReader matching.ReserveReader
 	reader, err := poolfallback.Dial(config.ChainURL)
 	if err != nil {
 		logger.Infof("pool fallback disabled: %v", err)
-	} else {
+	} else if reader != nil {
 		poolFallback = poolfallback.New(reader, vaultAddress, signer.Sign)
+		dialedReader = reader
 	}
+
+	matchingEngine := matching.New(pairs, balances, poolFallback, dialedReader)
+	matchingEngine.StartResolver()
 
 	e := &Extension{
 		vault:    vaultHandler,
-		matching: matching.New(pairs, balances, poolFallback),
+		matching: matchingEngine,
 	}
 
 	mux := http.NewServeMux()
@@ -141,8 +153,8 @@ func (e *Extension) processInstruction(action teetypes.Action) (int, []byte) {
 	return http.StatusOK, b
 }
 
-// processDirect handles off-chain direct actions — order placement,
-// cancellation, and (once implemented) state/history queries.
+// processDirect handles off-chain direct actions — SWAP submission,
+// cancellation, GET_MY_STATE polling, and withdrawal requests.
 func (e *Extension) processDirect(action teetypes.Action) (int, []byte) {
 	di, err := processorutils.Parse[teetypes.DirectInstruction](action.Data.Message)
 	if err != nil {
@@ -165,10 +177,12 @@ func (e *Extension) processDirect(action teetypes.Action) (int, []byte) {
 	var ar teetypes.ActionResult
 
 	switch {
-	case di.OPCommand == teeutils.ToHash(config.OPCommandPlaceOrder):
-		ar = e.processPlaceOrder(action, df, di.Message)
-	case di.OPCommand == teeutils.ToHash(config.OPCommandCancelOrder):
-		ar = e.processCancelOrder(action, df, di.Message)
+	case di.OPCommand == teeutils.ToHash(config.OPCommandSwap):
+		ar = e.processSwap(action, df, di.Message)
+	case di.OPCommand == teeutils.ToHash(config.OPCommandCancelSwap):
+		ar = e.processCancelSwap(action, df, di.Message)
+	case di.OPCommand == teeutils.ToHash(config.OPCommandGetMyState):
+		ar = e.processGetMyState(action, df, di.Message)
 	case di.OPCommand == teeutils.ToHash(config.OPCommandWithdrawRequest):
 		ar = e.processWithdrawRequest(action, df, di.Message)
 	default:

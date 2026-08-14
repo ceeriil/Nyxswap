@@ -19,24 +19,34 @@ import (
 // DEPOSIT/WITHDRAW are deliberately left out rather than guessed at. Their
 // result types (JSON) are registered below.
 func RegisterDecoders(r *decoder.Registry) {
-	// PLACE_ORDER message + result
+	// SWAP message + result
 	r.Register(
-		decoder.RegistryKey{OPType: config.OPTypeTrading, OPCommand: config.OPCommandPlaceOrder, Kind: decoder.KindMessage},
-		decoder.NewJSONDecoder[PlaceOrderRequest](),
+		decoder.RegistryKey{OPType: config.OPTypeTrading, OPCommand: config.OPCommandSwap, Kind: decoder.KindMessage},
+		decoder.NewJSONDecoder[SwapRequest](),
 	)
 	r.Register(
-		decoder.RegistryKey{OPType: config.OPTypeTrading, OPCommand: config.OPCommandPlaceOrder, Kind: decoder.KindResult},
-		decoder.NewJSONDecoder[PlaceOrderResponse](),
+		decoder.RegistryKey{OPType: config.OPTypeTrading, OPCommand: config.OPCommandSwap, Kind: decoder.KindResult},
+		decoder.NewJSONDecoder[SwapResponse](),
 	)
 
-	// CANCEL_ORDER message + result
+	// CANCEL_SWAP message + result
 	r.Register(
-		decoder.RegistryKey{OPType: config.OPTypeTrading, OPCommand: config.OPCommandCancelOrder, Kind: decoder.KindMessage},
-		decoder.NewJSONDecoder[CancelOrderRequest](),
+		decoder.RegistryKey{OPType: config.OPTypeTrading, OPCommand: config.OPCommandCancelSwap, Kind: decoder.KindMessage},
+		decoder.NewJSONDecoder[CancelSwapRequest](),
 	)
 	r.Register(
-		decoder.RegistryKey{OPType: config.OPTypeTrading, OPCommand: config.OPCommandCancelOrder, Kind: decoder.KindResult},
-		decoder.NewJSONDecoder[CancelOrderResponse](),
+		decoder.RegistryKey{OPType: config.OPTypeTrading, OPCommand: config.OPCommandCancelSwap, Kind: decoder.KindResult},
+		decoder.NewJSONDecoder[CancelSwapResponse](),
+	)
+
+	// GET_MY_STATE message + result
+	r.Register(
+		decoder.RegistryKey{OPType: config.OPTypeTrading, OPCommand: config.OPCommandGetMyState, Kind: decoder.KindMessage},
+		decoder.NewJSONDecoder[GetMyStateRequest](),
+	)
+	r.Register(
+		decoder.RegistryKey{OPType: config.OPTypeTrading, OPCommand: config.OPCommandGetMyState, Kind: decoder.KindResult},
+		decoder.NewJSONDecoder[GetMyStateResponse](),
 	)
 
 	// DEPOSIT result (message is ABI-encoded — see doc comment above)
